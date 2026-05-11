@@ -192,3 +192,16 @@ class OllamaClient:
         except Exception as e:
             logger.error("ollama_embed_error", error=str(e))
             raise
+
+    async def get_running_models(self) -> List[Dict[str, Any]]:
+        """
+        Return models currently loaded in memory via GET /api/ps.
+        """
+        try:
+            async with httpx.AsyncClient(base_url=self.base_url) as client:
+                response = await client.get("/api/ps")
+                response.raise_for_status()
+                return response.json().get("models", [])
+        except Exception as e:
+            logger.debug("ollama_get_running_models_failed", error=str(e))
+            return []
