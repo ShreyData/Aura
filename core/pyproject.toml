@@ -1,0 +1,27 @@
+[project]
+name = "aura-core"
+version = "0.1.0"
+description = "Privacy-first, ambient AI desktop layer powered by Gemma 4"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2.0",
+    "pydantic-settings",
+    "httpx",
+    "structlog",
+    "typer",
+    "psutil",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+    "pytest-asyncio",
+    "respx",
+    "ruff",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

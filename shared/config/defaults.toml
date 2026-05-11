@@ -1,0 +1,10 @@
+core_port = 11434
+ollama_port = 11435
+ollama_models_dir = "~/.aura/models"
+default_model = "gemma:2b"
+embed_model = "nomic-embed-text"
+workspace_path = "~/.aura/workspace"
+allow_system_paths = false
+require_approval_medium = true
+log_level = "INFO"
+auto_unload_minutes = 5
