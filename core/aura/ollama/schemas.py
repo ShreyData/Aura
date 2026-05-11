@@ -9,8 +9,8 @@ class OllamaMessage(BaseModel):
     Represents a single message in an Ollama chat conversation.
     """
 
-    role: str
-    content: str
+    role: Optional[str] = None
+    content: str = ""
     images: Optional[List[str]] = None
     tool_calls: Optional[List[Dict[str, Any]]] = None
 
@@ -34,8 +34,8 @@ class OllamaChatChunk(BaseModel):
     A single NDJSON chunk returned by /api/chat when streaming.
     """
 
-    model: str
-    created_at: datetime
+    model: Optional[str] = None
+    created_at: Optional[datetime] = None
     message: Optional[OllamaMessage] = None
     done: bool
     done_reason: Optional[str] = None

@@ -182,7 +182,7 @@ async def handle_ws_chat(
             await manager.send_personal_message(
                 {
                     "type": "tool_call_start",
-                    "payload": {"tool_name": e.tool_name, "args": e.args, "request_id": request_id},
+                    "payload": {"tool_name": e.tool_name, "args": e.tool_args, "request_id": request_id},
                 },
                 websocket,
             )

@@ -22,11 +22,11 @@ class ToolCallDetected(Exception):
     Raised when a tool call is detected in the Ollama response stream.
     """
 
-    def __init__(self, tool_name: str, args: Dict[str, Any], partial_response: str):
-        self.tool_name = tool_name
-        self.args = args
-        self.partial_response = partial_response
+    def __init__(self, tool_name: str, tool_args: Dict[str, Any], partial_response: str):
         super().__init__(f"Tool call detected: {tool_name}")
+        self.tool_name = tool_name
+        self.tool_args = tool_args
+        self.partial_response = partial_response
 
 
 class OllamaClient:
@@ -104,9 +104,9 @@ class OllamaClient:
                                 tool_call = chunk.message.tool_calls[0]
                                 function = tool_call.get("function", {})
                                 raise ToolCallDetected(
-                                    tool_name=function.get("name", "unknown"),
-                                    args=function.get("arguments", {}),
-                                    partial_response=partial_response,
+                                    function.get("name", "unknown"),
+                                    function.get("arguments", {}),
+                                    partial_response,
                                 )
 
                             # Yield normal content

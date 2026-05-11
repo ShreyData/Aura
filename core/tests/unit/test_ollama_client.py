@@ -24,9 +24,9 @@ async def test_health_failure(client):
 @respx.mock
 async def test_stream_chat_yields_tokens(client):
     stream_content = (
-        json.dumps({"message": {"content": "Hello"}, "done": False}) + "\n" +
-        json.dumps({"message": {"content": " world"}, "done": False}) + "\n" +
-        json.dumps({"done": True}) + "\n"
+        json.dumps({"model": "gemma:2b", "created_at": "2024-01-01T00:00:00Z", "message": {"role": "assistant", "content": "Hello"}, "done": False}) + "\n" +
+        json.dumps({"model": "gemma:2b", "created_at": "2024-01-01T00:00:01Z", "message": {"role": "assistant", "content": " world"}, "done": False}) + "\n" +
+        json.dumps({"model": "gemma:2b", "created_at": "2024-01-01T00:00:02Z", "done": True}) + "\n"
     )
     respx.post("http://127.0.0.1:11435/api/chat").mock(return_value=Response(200, content=stream_content))
     
@@ -40,9 +40,12 @@ async def test_stream_chat_yields_tokens(client):
 @respx.mock
 async def test_stream_chat_raises_tool_call(client):
     stream_content = (
-        json.dumps({"message": {"content": "I will check that for you."}, "done": False}) + "\n" +
+        json.dumps({"model": "gemma:2b", "created_at": "2024-01-01T00:00:00Z", "message": {"role": "assistant", "content": "I will check that for you."}, "done": False}) + "\n" +
         json.dumps({
+            "model": "gemma:2b",
+            "created_at": "2024-01-01T00:00:01Z",
             "message": {
+                "role": "assistant",
                 "tool_calls": [{
                     "function": {
                         "name": "get_weather",
@@ -60,7 +63,7 @@ async def test_stream_chat_raises_tool_call(client):
             pass
     
     assert excinfo.value.tool_name == "get_weather"
-    assert excinfo.value.args == {"location": "London"}
+    assert excinfo.value.tool_args == {"location": "London"}
     assert excinfo.value.partial_response == "I will check that for you."
 
 @pytest.mark.asyncio

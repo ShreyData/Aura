@@ -142,7 +142,7 @@ async def chat_completions(
                         pending = PendingToolCall(
                             request_id=tool_call_id,
                             tool_name=e.tool_name,
-                            args=e.args,
+                            args=e.tool_args,
                             risk_level="medium",
                         )
                         await event_bus.publish("tool_approval_requested", pending.model_dump())
@@ -152,7 +152,7 @@ async def chat_completions(
 
                     if approved:
                         # 2. Execute Tool
-                        result = await execute_tool(e.tool_name, e.args)
+                        result = await execute_tool(e.tool_name, e.tool_args)
                         
                         # 3. Inject result and resume
                         # Add assistant's partial response + the tool call to history
@@ -165,7 +165,7 @@ async def chat_completions(
                                     "type": "function",
                                     "function": {
                                         "name": e.tool_name,
-                                        "arguments": json.dumps(e.args)
+                                        "arguments": json.dumps(e.tool_args)
                                     }
                                 }
                             ]
