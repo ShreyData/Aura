@@ -1,5 +1,5 @@
-core_port = 11434
-ollama_port = 11435
+core_port = 11430
+ollama_port = 11434
 ollama_models_dir = "~/.aura/models"
 default_model = "gemma:2b"
 embed_model = "nomic-embed-text"
