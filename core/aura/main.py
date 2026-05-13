@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from aura.api.deps import get_ollama_client
-from aura.api.routes import chat, health, models, ws
+from aura.api.routes import chat, health, models, tools, ws
 from aura.config import get_config
 from aura.events import get_event_bus
 
@@ -146,6 +146,7 @@ def create_app() -> FastAPI:
     app.include_router(chat.router)
     app.include_router(ws.router)
     app.include_router(models.router)
+    app.include_router(tools.router)
 
     return app
 
