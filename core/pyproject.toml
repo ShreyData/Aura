@@ -16,6 +16,8 @@ dependencies = [
     "pyperclip",
     "mss",
     "Pillow",
+    "sounddevice",
+    "numpy",
     "python-xlib; sys_platform == 'linux'",
     "dbus-python; sys_platform == 'linux'",
     "pyobjc; sys_platform == 'darwin'",
