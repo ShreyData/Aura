@@ -184,6 +184,55 @@ class LinuxAdapter(PlatformAdapter):
         except Exception as e:
             logger.error("linux_lock_screen_failed", error=str(e))
 
+    def focus_window(self, title: str) -> bool:
+        """
+        Attempts to focus a window by its title using Xlib.
+        """
+        if self.is_wayland:
+            return False
+
+        if not display:
+            return False
+
+        try:
+            d = display.Display()
+            root = d.screen().root
+            
+            # Find the window
+            window_id_prop = d.intern_atom("_NET_CLIENT_LIST")
+            res = root.get_full_property(window_id_prop, X.AnyPropertyType)
+            
+            if not res or not res.value:
+                return False
+                
+            for window_id in res.value:
+                window_obj = d.create_resource_object("window", window_id)
+                for atom_name in ["_NET_WM_NAME", "WM_NAME"]:
+                    atom = d.intern_atom(atom_name)
+                    name_res = window_obj.get_full_property(atom, 0)
+                    if name_res and name_res.value:
+                        name = ""
+                        if isinstance(name_res.value, bytes):
+                            name = name_res.value.decode("utf-8", errors="ignore")
+                        else:
+                            name = str(name_res.value)
+                        
+                        if title.lower() in name.lower():
+                            # Focus the window
+                            active_atom = d.intern_atom("_NET_ACTIVE_WINDOW")
+                            ev = display.event.ClientMessage(
+                                window=window_obj,
+                                client_type=active_atom,
+                                data=(32, [1, X.CurrentTime, 0, 0, 0])
+                            )
+                            root.send_event(ev, event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask)
+                            d.display.sync()
+                            return True
+            return False
+        except Exception as e:
+            logger.error("linux_focus_window_failed", title=title, error=str(e))
+            return False
+
     def get_idle_time_seconds(self) -> float:
         """
         Returns user idle time in seconds.

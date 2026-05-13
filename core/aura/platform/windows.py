@@ -163,6 +163,35 @@ class WindowsAdapter(PlatformAdapter):
         except Exception as e:
             logger.error("win32_lock_screen_failed", error=str(e))
 
+    def focus_window(self, title: str) -> bool:
+        """
+        Attempts to focus a window by its title using win32gui.
+        """
+        if not win32gui:
+            return False
+            
+        def callback(hwnd, windows):
+            if win32gui.IsWindowVisible(hwnd):
+                window_text = win32gui.GetWindowText(hwnd)
+                if title.lower() in window_text.lower():
+                    windows.append(hwnd)
+
+        windows = []
+        win32gui.EnumWindows(callback, windows)
+        
+        if not windows:
+            return False
+            
+        try:
+            # Try to bring the first match to foreground
+            hwnd = windows[0]
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            win32gui.SetForegroundWindow(hwnd)
+            return True
+        except Exception as e:
+            logger.error("win32_focus_window_failed", title=title, error=str(e))
+            return False
+
     def get_idle_time_seconds(self) -> float:
         """
         Returns user idle time in seconds using GetLastInputInfo.

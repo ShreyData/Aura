@@ -174,6 +174,18 @@ class MacOSAdapter(PlatformAdapter):
         except Exception as e:
             logger.error("macos_lock_screen_failed", error=str(e))
 
+    def focus_window(self, title: str) -> bool:
+        """
+        Attempts to focus a window by its title using AppleScript.
+        """
+        script = f'tell application "System Events" to set frontmost of (every process whose name contains "{title}") to true'
+        try:
+            subprocess.run(["osascript", "-e", script], check=True, capture_output=True)
+            return True
+        except Exception as e:
+            logger.error("macos_focus_window_failed", title=title, error=str(e))
+            return False
+
     def get_idle_time_seconds(self) -> float:
         """
         Returns user idle time in seconds using Quartz.

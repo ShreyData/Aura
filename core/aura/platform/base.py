@@ -60,6 +60,14 @@ class PlatformAdapter(ABC):
         pass
 
     @abstractmethod
+    def focus_window(self, title: str) -> bool:
+        """
+        Attempts to bring a window with the given title to the foreground.
+        Returns True if successful, False otherwise.
+        """
+        pass
+
+    @abstractmethod
     def get_idle_time_seconds(self) -> float:
         """
         Returns the number of seconds since the last user input (keyboard/mouse).
