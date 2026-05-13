@@ -1,6 +1,8 @@
 /plan
 /.gemini
 /docs
+GEMINI.md
+settings.json
 
 # Python virtual environments
 .venv/

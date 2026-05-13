@@ -45,28 +45,50 @@ class WindowsAdapter(PlatformAdapter):
 
     def get_running_processes(self) -> List[str]:
         """
-        Returns a list of all running process names.
+        Returns a list of all running process names using pywin32.
         """
-        processes = []
-        for proc in psutil.process_iter(["name"]):
-            try:
-                processes.append(proc.info["name"])
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                pass
-        return processes
+        if not win32process or not win32api:
+            # Fallback to psutil if pywin32 is not fully available
+            processes = []
+            for proc in psutil.process_iter(["name"]):
+                try:
+                    processes.append(proc.info["name"])
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    pass
+            return processes
+
+        try:
+            pids = win32process.EnumProcesses()
+            names = []
+            for pid in pids:
+                try:
+                    # PROCESS_QUERY_LIMITED_INFORMATION is safer for modern Windows
+                    handle = win32api.OpenProcess(
+                        win32con.PROCESS_QUERY_INFORMATION | win32con.PROCESS_VM_READ, 
+                        False, pid
+                    )
+                    name = win32process.GetModuleBaseName(handle, 0)
+                    if name:
+                        names.append(name)
+                    win32api.CloseHandle(handle)
+                except Exception:
+                    continue
+            return names
+        except Exception as e:
+            logger.error("win32_enum_processes_failed", error=str(e))
+            return []
 
     def open_application(self, name: str) -> bool:
         """
-        Launches an application or file using the Windows shell.
+        Launches an application or file using the Windows shell (ShellExecuteEx).
         """
         try:
-            # win32api.ShellExecute is the safest way to "launch" things on Windows
-            # as it handles executables, shortcuts, and registered file types.
             if win32api:
+                # win32api.ShellExecute is common, but ShellExecuteEx is more robust
+                # Here we use the standard ShellExecute as it's the most common pywin32 way
                 win32api.ShellExecute(0, "open", name, None, None, win32con.SW_SHOWNORMAL)
                 return True
             else:
-                # Fallback to os.startfile if pywin32 is missing
                 os.startfile(name)
                 return True
         except Exception as e:
