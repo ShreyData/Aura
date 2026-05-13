@@ -3,12 +3,14 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 
+from aura.io.screen import ScreenCapture
+
 logger = structlog.get_logger()
 
 
 def build_messages(
     messages: List[Dict[str, Any]],
-    screen_capture: Optional[str] = None,
+    screen_capture: Optional[ScreenCapture | str] = None,
     rag_context: Optional[List[str]] = None,
     tool_schemas: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
@@ -20,27 +22,44 @@ def build_messages(
     - Attaches screen capture to the images array of the last user message.
     """
     final_messages = [dict(m) for m in messages]
+    
+    # 1. Extract Base64 from ScreenCapture or raw string
+    base64_image = None
+    has_screenshot = False
+    
+    if isinstance(screen_capture, ScreenCapture):
+        base64_image = screen_capture.base64_jpeg
+        has_screenshot = True
+    elif isinstance(screen_capture, str):
+        base64_image = screen_capture
+        has_screenshot = True
 
-    # 1. Inject Screen Capture
-    if screen_capture:
+    # 2. Inject Screen Capture into Messages
+    if base64_image:
         # Find the last user message to attach the image
         for i in range(len(final_messages) - 1, -1, -1):
             if final_messages[i].get("role") == "user":
                 if "images" not in final_messages[i]:
                     final_messages[i]["images"] = []
                 # Ensure we don't duplicate the same capture
-                if screen_capture not in final_messages[i]["images"]:
-                    final_messages[i]["images"].append(screen_capture)
+                if base64_image not in final_messages[i]["images"]:
+                    final_messages[i]["images"].append(base64_image)
                 break
         else:
             logger.warning("prompt_composer_no_user_message_for_image")
 
-    # 2. Construct System Instructions (Tools + Instructions)
+    # 3. Construct System Instructions
     system_content = (
         "You are Aura, a privacy-first, ambient AI assistant. "
         "You can see the user's screen and act on their operating system. "
         "Always be concise and helpful.\n\n"
     )
+
+    if has_screenshot:
+        system_content += (
+            "IMPORTANT: A screenshot of the user's current screen is attached "
+            "to their last message. Analyze it to provide context-aware help.\n\n"
+        )
 
     if tool_schemas:
         system_content += "Available Tools:\n"
