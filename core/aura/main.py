@@ -12,6 +12,8 @@ from aura.api.deps import get_ollama_client
 from aura.api.routes import chat, health, models, tools, ws
 from aura.config import get_config
 from aura.events import get_event_bus
+from aura.tools.registry import get_tool_registry
+from aura.tools.approval import get_approval_gate
 
 
 def configure_logging():
@@ -83,14 +85,19 @@ async def lifespan(app: FastAPI):
     # 1. Configure Logging
     configure_logging()
     
-    # 2. Start Event Bus Dispatch Loop
-    event_bus = get_event_bus()
-    dispatch_task = asyncio.create_task(event_bus.dispatch_loop())
+    # 2. Initialize Singletons in app.state
+    # This ensures consistency across requests and makes testing easier
+    app.state.event_bus = get_event_bus()
+    app.state.tool_registry = get_tool_registry()
+    app.state.approval_gate = get_approval_gate()
     
-    # 3. Setup WebSocket Forwarding
+    # 3. Start Event Bus Dispatch Loop
+    dispatch_task = asyncio.create_task(app.state.event_bus.dispatch_loop())
+    
+    # 4. Setup WebSocket Forwarding
     await ws.forward_events_to_ws()
     
-    # 4. Verify Ollama Health with Retries
+    # 5. Verify Ollama Health with Retries
     ollama_client = get_ollama_client()
     ollama_ready = False
     logger.info("waiting_for_ollama")

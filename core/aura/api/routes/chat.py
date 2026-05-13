@@ -8,7 +8,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from aura.api.deps import get_ollama_client
+from aura.api.deps import get_ollama_client, get_approval_gate, get_tool_registry
 from aura.api.schemas import (
     ChatCompletionChunk,
     ChatCompletionChunkChoice,
@@ -23,42 +23,11 @@ from aura.config import Settings, get_config
 from aura.events import EventBus, get_event_bus
 from aura.io.prompt_composer import build_messages
 from aura.ollama.client import OllamaClient, ToolCallDetected
+from aura.tools.approval import ApprovalGate
+from aura.tools.registry import ToolRegistry
 
 router = APIRouter()
 logger = structlog.get_logger()
-
-
-async def wait_for_tool_approval(request_id: str, event_bus: EventBus) -> bool:
-    """
-    Wait for a tool approval event on the event bus.
-    """
-    loop = asyncio.get_running_loop()
-    future = loop.create_future()
-
-    async def on_approval(event_type: str, payload: Dict[str, Any]) -> None:
-        if payload.get("request_id") == request_id:
-            future.set_result(payload.get("approved", False))
-
-    await event_bus.subscribe("tool_approved", on_approval)
-    try:
-        # Wait for up to 60 seconds for user approval
-        approved = await asyncio.wait_for(future, timeout=60.0)
-        return approved
-    except asyncio.TimeoutError:
-        logger.warning("tool_approval_timeout", request_id=request_id)
-        return False
-    finally:
-        await event_bus.unsubscribe("tool_approved", on_approval)
-
-
-async def execute_tool(tool_name: str, args: Dict[str, Any]) -> Any:
-    """
-    Placeholder for tool execution logic.
-    In a full implementation, this would route to the appropriate tool handler.
-    """
-    logger.info("executing_tool", tool_name=tool_name, args=args)
-    # TODO: Implement actual tool execution registry in Step 2.x
-    return {"status": "success", "message": f"Tool {tool_name} executed (placeholder)"}
 
 
 @router.post("/v1/chat/completions")
@@ -67,6 +36,8 @@ async def chat_completions(
     ollama: Annotated[OllamaClient, Depends(get_ollama_client)],
     event_bus: Annotated[EventBus, Depends(get_event_bus)],
     config: Annotated[Settings, Depends(get_config)],
+    approval_gate: Annotated[ApprovalGate, Depends(get_approval_gate)],
+    tool_registry: Annotated[ToolRegistry, Depends(get_tool_registry)],
 ) -> Any:
     """
     OpenAI-compatible chat completion endpoint.
@@ -76,11 +47,16 @@ async def chat_completions(
     created_time = int(time.time())
 
     # Build initial message list including system prompt and context
-    # We convert Pydantic models to dicts for the prompt composer
     raw_messages = [m.model_dump(exclude_none=True) for m in request.messages]
+    
+    # If tools are not provided in request, use all available tools from registry
+    tool_schemas = request.tools
+    if not tool_schemas:
+        tool_schemas = tool_registry.generate_tool_schemas()
+
     messages = build_messages(
         messages=raw_messages,
-        tool_schemas=request.tools,
+        tool_schemas=tool_schemas,
     )
 
     async def stream_generator():
@@ -95,7 +71,7 @@ async def chat_completions(
                     async for token in ollama.stream_chat(
                         model=request.model,
                         messages=messages,
-                        tools=request.tools,
+                        tools=tool_schemas,
                     ):
                         chunk = ChatCompletionChunk(
                             id=request_id,
@@ -131,31 +107,48 @@ async def chat_completions(
                 except ToolCallDetected as e:
                     logger.info("tool_call_detected", tool_name=e.tool_name)
                     
-                    # Generate a unique ID for this tool call instance
-                    tool_call_id = str(uuid.uuid4())
-                    
+                    tool = tool_registry.get_tool(e.tool_name)
+                    if not tool:
+                        logger.error("tool_not_found", tool_name=e.tool_name)
+                        messages.append({
+                            "role": "assistant",
+                            "content": e.partial_response
+                        })
+                        messages.append({
+                            "role": "tool",
+                            "name": e.tool_name,
+                            "content": json.dumps({"error": f"Tool {e.tool_name} not found"})
+                        })
+                        continue
+
                     # 1. Approval Gate
                     approved = True
-                    # Only require approval if configured
-                    if config.require_approval_medium:
-                        # Publish pending tool call event for the UI/WebSocket
-                        pending = PendingToolCall(
-                            request_id=tool_call_id,
+                    # Check risk level and config
+                    if (tool.risk_level.value == "high" or 
+                        (tool.risk_level.value == "medium" and config.require_approval_medium)):
+                        
+                        approved = await approval_gate.request_approval(
                             tool_name=e.tool_name,
                             args=e.tool_args,
-                            risk_level="medium",
+                            risk_level=tool.risk_level
                         )
-                        await event_bus.publish("tool_approval_requested", pending.model_dump())
-                        
-                        # Pause and wait for UI approval via event bus
-                        approved = await wait_for_tool_approval(tool_call_id, event_bus)
 
                     if approved:
                         # 2. Execute Tool
-                        result = await execute_tool(e.tool_name, e.tool_args)
+                        logger.info("executing_tool", tool_name=e.tool_name, args=e.tool_args)
+                        await event_bus.publish("tool_call_start", {"tool_name": e.tool_name, "args": e.tool_args})
+                        
+                        result = await tool.execute(**e.tool_args)
+                        
+                        await event_bus.publish("tool_result", {
+                            "tool_name": e.tool_name,
+                            "success": result.success,
+                            "output": result.output,
+                            "error": result.error
+                        })
                         
                         # 3. Inject result and resume
-                        # Add assistant's partial response + the tool call to history
+                        tool_call_id = str(uuid.uuid4())
                         messages.append({
                             "role": "assistant",
                             "content": e.partial_response,
@@ -170,18 +163,16 @@ async def chat_completions(
                                 }
                             ]
                         })
-                        # Add the tool's output to history
                         messages.append({
                             "role": "tool",
                             "name": e.tool_name,
-                            "content": json.dumps(result)
+                            "content": json.dumps(result.output if result.success else {"error": result.error})
                         })
                         
                         logger.info("resuming_after_tool_call", tool_name=e.tool_name)
-                        # Loop continues, calling ollama.stream_chat again with updated history
                     else:
-                        # Tool denied: notify the user in the stream and stop
-                        denial_msg = "\n[Tool call denied by user]"
+                        # Tool denied
+                        denial_msg = f"\n[Tool call '{e.tool_name}' denied by user]"
                         chunk = ChatCompletionChunk(
                             id=request_id,
                             created=created_time,
@@ -208,7 +199,7 @@ async def chat_completions(
     if request.stream:
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
 
-    # Non-streaming implementation: collect chunks and return a single response
+    # Non-streaming implementation
     full_content = ""
     async for chunk_str in stream_generator():
         if chunk_str.startswith("data: ") and not chunk_str.endswith("[DONE]\n\n"):

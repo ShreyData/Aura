@@ -20,8 +20,14 @@ class ApprovalGate:
     def __init__(self) -> None:
         # Maps request_id -> (asyncio.Event, approval_status, PendingToolCall)
         self._pending: Dict[str, tuple[asyncio.Event, bool, PendingToolCall]] = {}
-        self._lock = asyncio.Lock()
+        self._lock: Optional[asyncio.Lock] = None
         self._event_bus = get_event_bus()
+
+    async def _get_lock(self) -> asyncio.Lock:
+        """Lazy initialization of the lock to ensure it binds to the current loop."""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     async def request_approval(
         self, tool_name: str, args: Dict[str, Any], risk_level: RiskLevel
@@ -40,7 +46,8 @@ class ApprovalGate:
             risk_level=risk_level.value,
         )
 
-        async with self._lock:
+        lock = await self._get_lock()
+        async with lock:
             # Status defaults to False (denied) until explicitly approved
             self._pending[request_id] = (event, False, pending_call)
 
@@ -58,7 +65,7 @@ class ApprovalGate:
             # Wait for 60 seconds for a response
             await asyncio.wait_for(event.wait(), timeout=60.0)
             
-            async with self._lock:
+            async with lock:
                 _, approved, _ = self._pending.get(request_id, (None, False, None))
                 return approved
 
@@ -67,7 +74,7 @@ class ApprovalGate:
             return False
         finally:
             # Always clean up the pending request
-            async with self._lock:
+            async with lock:
                 self._pending.pop(request_id, None)
 
     async def respond(self, request_id: str, approved: bool) -> bool:
@@ -75,7 +82,8 @@ class ApprovalGate:
         Processes a response from the user/UI for a specific request ID.
         Returns True if the request was found and updated, False otherwise.
         """
-        async with self._lock:
+        lock = await self._get_lock()
+        async with lock:
             if request_id not in self._pending:
                 logger.warning("tool_approval_response_invalid_id", request_id=request_id)
                 return False
@@ -97,7 +105,8 @@ class ApprovalGate:
         """
         Returns a list of all tool calls currently awaiting approval.
         """
-        async with self._lock:
+        lock = await self._get_lock()
+        async with lock:
             return [data[2] for data in self._pending.values()]
 
 
@@ -113,3 +122,11 @@ def get_approval_gate() -> ApprovalGate:
     if _gate is None:
         _gate = ApprovalGate()
     return _gate
+
+
+def reset_approval_gate() -> None:
+    """
+    Resets the ApprovalGate singleton. Useful for testing.
+    """
+    global _gate
+    _gate = None

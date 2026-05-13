@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Awaitable, Callable, Dict, List, Set, Tuple
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple
 
 import structlog
 
@@ -17,15 +17,28 @@ class EventBus:
 
     def __init__(self) -> None:
         self._subscribers: Dict[str, Set[EventCallback]] = {}
-        self._queue: asyncio.Queue[Tuple[str, Any]] = asyncio.Queue()
-        self._lock = asyncio.Lock()
+        self._queue: Optional[asyncio.Queue[Tuple[str, Any]]] = None
+        self._lock: Optional[asyncio.Lock] = None
+
+    def _get_queue(self) -> asyncio.Queue[Tuple[str, Any]]:
+        """Lazy initialization of the queue."""
+        if self._queue is None:
+            self._queue = asyncio.Queue()
+        return self._queue
+
+    async def _get_lock(self) -> asyncio.Lock:
+        """Lazy initialization of the lock."""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     async def subscribe(self, event_type: str, callback: EventCallback) -> None:
         """
         Registers a callback for a specific event type.
         Use '*' as event_type to subscribe to all events.
         """
-        async with self._lock:
+        lock = await self._get_lock()
+        async with lock:
             if event_type not in self._subscribers:
                 self._subscribers[event_type] = set()
             self._subscribers[event_type].add(callback)
@@ -39,7 +52,8 @@ class EventBus:
         """
         Unregisters a callback from an event type.
         """
-        async with self._lock:
+        lock = await self._get_lock()
+        async with lock:
             if event_type in self._subscribers:
                 self._subscribers[event_type].discard(callback)
                 if not self._subscribers[event_type]:
@@ -55,7 +69,8 @@ class EventBus:
         Publishes an event to the bus. This method is async and safe to call
         from multiple concurrent tasks within the same event loop.
         """
-        await self._queue.put((event_type, payload))
+        queue = self._get_queue()
+        await queue.put((event_type, payload))
         logger.debug("event_published", event_type=event_type)
 
     def publish_threadsafe(self, event_type: str, payload: Any) -> None:
@@ -63,8 +78,9 @@ class EventBus:
         Publishes an event to the bus from a different thread.
         Useful for bridge logic or blocking OS calls.
         """
+        queue = self._get_queue()
         loop = asyncio.get_event_loop()
-        loop.call_soon_threadsafe(self._queue.put_nowait, (event_type, payload))
+        loop.call_soon_threadsafe(queue.put_nowait, (event_type, payload))
         logger.debug("event_published_threadsafe", event_type=event_type)
 
     async def dispatch_loop(self) -> None:
@@ -73,12 +89,15 @@ class EventBus:
         This task should be started during application startup.
         """
         logger.info("event_bus_dispatch_loop_started")
+        queue = self._get_queue()
+        lock = await self._get_lock()
+        
         try:
             while True:
-                event_type, payload = await self._queue.get()
+                event_type, payload = await queue.get()
 
                 # Get a copy of the subscribers under lock to avoid race conditions
-                async with self._lock:
+                async with lock:
                     subscribers = list(self._subscribers.get(event_type, set()))
                     # Support wildcard subscribers
                     wildcards = list(self._subscribers.get("*", set()))
@@ -86,15 +105,13 @@ class EventBus:
 
                 if targets:
                     # Dispatch to all subscribers concurrently using gather
-                    # We wrap each callback in a try-except via a helper to ensure
-                    # one failing subscriber doesn't crash the loop.
                     tasks = [
                         self._safe_dispatch(callback, event_type, payload)
                         for callback in targets
                     ]
                     await asyncio.gather(*tasks)
 
-                self._queue.task_done()
+                queue.task_done()
         except asyncio.CancelledError:
             logger.info("event_bus_dispatch_loop_stopped")
             raise
@@ -119,11 +136,22 @@ class EventBus:
 
 
 # Singleton instance
-_bus = EventBus()
+_bus: Optional[EventBus] = None
 
 
 def get_event_bus() -> EventBus:
     """
     Returns the global EventBus singleton.
     """
+    global _bus
+    if _bus is None:
+        _bus = EventBus()
     return _bus
+
+
+def reset_event_bus() -> None:
+    """
+    Resets the EventBus singleton. Useful for testing.
+    """
+    global _bus
+    _bus = None

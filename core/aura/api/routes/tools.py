@@ -2,9 +2,10 @@ from typing import Annotated, Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from aura.api.deps import get_approval_gate, get_tool_registry
 from aura.api.schemas import PendingToolCall, ToolApprovalRequest
-from aura.tools.registry import ToolRegistry, get_tool_registry
-from aura.tools.approval import ApprovalGate, get_approval_gate
+from aura.tools.approval import ApprovalGate
+from aura.tools.registry import ToolRegistry
 
 router = APIRouter(prefix="/v1/tools", tags=["tools"])
 

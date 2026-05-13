@@ -149,3 +149,11 @@ def get_tool_registry() -> ToolRegistry:
     if _registry is None:
         _registry = ToolRegistry()
     return _registry
+
+
+def reset_tool_registry() -> None:
+    """
+    Resets the ToolRegistry singleton. Useful for testing.
+    """
+    global _registry
+    _registry = None
