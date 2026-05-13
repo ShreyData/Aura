@@ -18,6 +18,7 @@ dependencies = [
     "Pillow",
     "sounddevice",
     "numpy",
+    "faster-whisper",
     "python-xlib; sys_platform == 'linux'",
     "dbus-python; sys_platform == 'linux'",
     "pyobjc; sys_platform == 'darwin'",
