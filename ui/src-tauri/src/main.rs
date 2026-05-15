@@ -3,6 +3,8 @@
 
 mod process;
 mod ipc;
+mod hotkeys;
+mod tray;
 
 use tauri::Manager;
 
@@ -11,7 +13,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_global_shortcut::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             ipc::health,
@@ -28,6 +30,16 @@ fn main() {
         .setup(|app| {
             let handle = app.handle().clone();
             
+            // 1. Setup Hotkeys
+            if let Err(e) = hotkeys::setup(&handle) {
+                eprintln!("Failed to setup hotkeys: {}", e);
+            }
+
+            // 2. Setup Tray
+            if let Err(e) = tray::setup(&handle) {
+                eprintln!("Failed to setup tray: {}", e);
+            }
+
             tauri::async_runtime::spawn(async move {
                 println!("Starting sidecars...");
                 
