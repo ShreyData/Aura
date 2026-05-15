@@ -2,6 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { Orb } from './components/Orb/Orb';
 
+import { PermissionDialog } from './components/PermissionDialog/PermissionDialog';
+
+import { OnboardingWizard } from './components/Onboarding/OnboardingWizard';
+
+import { Hub } from './components/Hub/Hub';
+
 const App: React.FC = () => {
   const [label, setLabel] = useState<string | null>(null);
 
@@ -15,23 +21,11 @@ const App: React.FC = () => {
     <div className="h-screen w-screen overflow-hidden">
       {label === 'orb' && <Orb />}
       
-      {label === 'hub' && (
-        <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white">
-          <h1>Aura Hub</h1>
-        </div>
-      )}
+      {label === 'hub' && <Hub />}
 
-      {label === 'permission' && (
-        <div className="flex h-screen w-screen items-center justify-center bg-gray-800 text-white border-2 border-amber-500">
-          <h1>Permission Request</h1>
-        </div>
-      )}
+      {label === 'permission' && <PermissionDialog />}
 
-      {label === 'onboarding' && (
-        <div className="flex h-screen w-screen items-center justify-center bg-gray-900 text-white">
-          <h1>Onboarding Wizard</h1>
-        </div>
-      )}
+      {label === 'onboarding' && <OnboardingWizard />}
     </div>
   );
 };

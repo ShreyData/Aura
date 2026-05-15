@@ -34,7 +34,7 @@ export const AuraCoreAPI = {
     return await invoke("ingest_file", { filePath });
   },
 
-  async listModels(): Promise<{ models: ModelInfo[]; active_model?: string }> {
+  async listModels(): Promise<{ models: ModelInfo[]; active_model?: string; active_model_vram?: number }> {
     return await invoke("list_models");
   },
 

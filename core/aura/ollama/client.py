@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 
@@ -122,9 +123,10 @@ class OllamaClient:
             logger.error("ollama_stream_chat_error", error=str(e))
             raise
 
-    async def pull_model(self, model: str, on_progress: Callable[[Dict[str, Any]], None]) -> None:
+    async def pull_model(self, model: str, on_progress: Callable[[Dict[str, Any]], Any]) -> None:
         """
         Download a model. Calls on_progress({ status, percent, completed, total }).
+        Supports both sync and async callbacks.
         """
         try:
             async with httpx.AsyncClient(base_url=self.base_url, timeout=None) as client:
@@ -141,12 +143,17 @@ class OllamaClient:
                         if progress.total and progress.completed:
                             percent = int((progress.completed / progress.total) * 100)
                         
-                        on_progress({
+                        payload = {
                             "status": progress.status,
                             "percent": percent,
                             "completed": progress.completed,
                             "total": progress.total
-                        })
+                        }
+                        
+                        if asyncio.iscoroutinefunction(on_progress):
+                            await on_progress(payload)
+                        else:
+                            on_progress(payload)
         except Exception as e:
             logger.error("ollama_pull_model_error", model=model, error=str(e))
             raise

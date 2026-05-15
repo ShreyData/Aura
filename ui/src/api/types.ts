@@ -10,6 +10,7 @@ export interface ChatMessage {
   content: string;
   name?: string;
   tool_calls?: any[];
+  images?: string[];
 }
 
 export interface ChatCompletionRequest {

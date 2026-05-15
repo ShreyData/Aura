@@ -7,8 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from aura.api.deps import get_ollama_client, get_ollama_manager
+from aura.api.deps import get_ollama_client, get_ollama_manager, get_event_bus
 from aura.config import get_config
+from aura.events import EventBus
 from aura.ollama.client import OllamaClient
 from aura.ollama.manager import OllamaManager
 
@@ -31,7 +32,9 @@ async def list_models(
     
     return {
         "models": models,
-        "active_model": status.get("model")
+        "active_model": status.get("model"),
+        "active_model_vram": status.get("size_vram", 0),
+        "status": status
     }
 
 @router.get("/v1/models/recommend")
@@ -48,21 +51,30 @@ async def recommend_model(
 async def pull_model(
     request: ModelPullRequest,
     ollama_client: Annotated[OllamaClient, Depends(get_ollama_client)],
+    event_bus: Annotated[EventBus, Depends(get_event_bus)],
 ) -> StreamingResponse:
     """
     Downloads a model from the Ollama library.
-    Streams progress as SSE events.
+    Streams progress as SSE events and publishes to the event bus for WebSocket clients.
     """
     async def progress_generator():
         queue = asyncio.Queue()
 
-        def on_progress(data: Dict[str, Any]) -> None:
+        async def on_progress(data: Dict[str, Any]) -> None:
             # Wrap callback data into a thread-safe-ish queue for the generator
-            # Since pull_model is called in the same loop, we can use put_nowait
             queue.put_nowait(data)
+            
+            # Also publish to the event bus for WebSocket clients
+            event_payload = {
+                "model": request.model,
+                "status": data.get("status"),
+                "percent": data.get("percent"),
+                "completed": data.get("completed"),
+                "total": data.get("total"),
+            }
+            await event_bus.publish("model_pull_progress", event_payload)
 
         # Start the pull operation
-        # Note: pull_model in client.py is 'async', so we need to run it in a task
         pull_task = asyncio.create_task(ollama_client.pull_model(request.model, on_progress))
 
         try:
