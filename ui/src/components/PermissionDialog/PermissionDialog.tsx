@@ -143,6 +143,13 @@ export const PermissionDialog: React.FC = () => {
         </div>
 
         <div className="space-y-1">
+          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Description</label>
+          <p className="text-sm text-gray-200 leading-relaxed">
+            {currentRequest.description}
+          </p>
+        </div>
+
+        <div className="space-y-1">
           <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Parameters</label>
           <div className="bg-black/50 border border-gray-800 rounded-xl p-3">
             <pre className="text-xs font-mono text-gray-400 overflow-x-auto">
@@ -151,9 +158,12 @@ export const PermissionDialog: React.FC = () => {
           </div>
         </div>
         
-        <p className="text-xs text-gray-400 leading-relaxed italic">
-          This tool requires your explicit permission to proceed. High-risk tools can modify system files or execute commands.
-        </p>
+        <div className="p-3 rounded-lg bg-gray-900 border border-gray-800 flex items-start gap-2">
+          <ShieldAlert size={14} className="text-amber-500 shrink-0 mt-0.5" />
+          <p className="text-[10px] text-gray-500 leading-tight">
+            Allowing this operation grants the AI permission to perform actions that may modify your system or data.
+          </p>
+        </div>
       </div>
 
       {/* Footer / Actions */}

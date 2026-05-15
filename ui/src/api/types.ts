@@ -81,6 +81,7 @@ export interface HealthResponse {
 export interface PendingToolCall {
   request_id: string;
   tool_name: string;
+  description: string;
   args: Record<string, any>;
   risk_level: 'low' | 'medium' | 'high';
 }

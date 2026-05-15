@@ -129,6 +129,7 @@ async def chat_completions(
                         
                         approved = await approval_gate.request_approval(
                             tool_name=e.tool_name,
+                            description=tool.description,
                             args=e.tool_args,
                             risk_level=tool.risk_level
                         )

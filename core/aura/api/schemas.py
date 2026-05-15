@@ -124,6 +124,7 @@ class PendingToolCall(BaseModel):
 
     request_id: str
     tool_name: str
+    description: str
     args: Dict[str, Any]
     risk_level: str
 

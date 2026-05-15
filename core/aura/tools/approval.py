@@ -30,7 +30,7 @@ class ApprovalGate:
         return self._lock
 
     async def request_approval(
-        self, tool_name: str, args: Dict[str, Any], risk_level: RiskLevel
+        self, tool_name: str, description: str, args: Dict[str, Any], risk_level: RiskLevel
     ) -> bool:
         """
         Creates a pending approval request and waits for a response or timeout.
@@ -42,6 +42,7 @@ class ApprovalGate:
         pending_call = PendingToolCall(
             request_id=request_id,
             tool_name=tool_name,
+            description=description,
             args=args,
             risk_level=risk_level.value,
         )
