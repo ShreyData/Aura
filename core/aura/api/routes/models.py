@@ -40,12 +40,11 @@ async def list_models(
 @router.get("/v1/models/recommend")
 async def recommend_model(
     ollama_manager: Annotated[OllamaManager, Depends(get_ollama_manager)],
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """
-    Returns a hardware-aware model recommendation based on system RAM.
+    Returns a hardware-aware model recommendation and system context.
     """
-    recommended = ollama_manager.get_recommended_model()
-    return {"recommended_model": recommended}
+    return ollama_manager.get_system_recommendation()
 
 @router.post("/v1/models/pull")
 async def pull_model(

@@ -24,7 +24,7 @@ export const OnboardingWizard: React.FC = () => {
   const [step, setStep] = useState(1);
   const { setOnboardingComplete, setWorkspacePath, setModelPreference } = useSettingsStore();
   
-  const [recommendedModel, setRecommendedModel] = useState<string | null>(null);
+  const [recommendation, setRecommendation] = useState<{ recommended_model: string; total_ram_gb: number; cpu_count: number } | null>(null);
   const [pullProgress, setPullProgress] = useState<{ percent: number; status: string } | null>(null);
   const [selectedPath, setSelectedPath] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,16 +32,16 @@ export const OnboardingWizard: React.FC = () => {
   useEffect(() => {
     if (step === 2) {
       AuraCoreAPI.getRecommendedModel().then(res => {
-        setRecommendedModel(res.recommended_model);
+        setRecommendation(res);
         setModelPreference(res.recommended_model);
       });
     }
 
-    if (step === 3 && recommendedModel) {
-      AuraCoreAPI.pullModel(recommendedModel);
+    if (step === 3 && recommendation) {
+      AuraCoreAPI.pullModel(recommendation.recommended_model);
       
       const unsub = auraWs.subscribe('model_pull_progress', (payload) => {
-        if (payload.model === recommendedModel) {
+        if (payload.model === recommendation.recommended_model) {
           setPullProgress({
             percent: payload.percent,
             status: payload.status || 'Downloading...'
@@ -53,7 +53,7 @@ export const OnboardingWizard: React.FC = () => {
       });
       return () => unsub();
     }
-  }, [step, recommendedModel, setModelPreference]);
+  }, [step, recommendation, setModelPreference]);
 
   const handlePickFolder = async () => {
     const selected = await open({
@@ -131,7 +131,9 @@ export const OnboardingWizard: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-400">System Detected</p>
-                  <p className="text-gray-100 font-bold">Standard Workstation</p>
+                  <p className="text-gray-100 font-bold">
+                    {recommendation ? `${recommendation.total_ram_gb}GB RAM / ${recommendation.cpu_count} Cores` : 'Analyzing...'}
+                  </p>
                 </div>
               </div>
 
@@ -141,14 +143,14 @@ export const OnboardingWizard: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-blue-400">Recommended Model</p>
-                  <p className="text-gray-100 font-mono font-bold">{recommendedModel || 'Calculating...'}</p>
+                  <p className="text-gray-100 font-mono font-bold">{recommendation?.recommended_model || 'Calculating...'}</p>
                 </div>
               </div>
             </div>
 
             <button 
               onClick={() => setStep(3)}
-              disabled={!recommendedModel}
+              disabled={!recommendation}
               className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50"
             >
               Initialize Intelligence

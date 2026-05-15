@@ -17,22 +17,31 @@ class OllamaManager:
     def __init__(self, client: Optional[OllamaClient] = None) -> None:
         self.client = client or OllamaClient()
 
-    def get_recommended_model(self) -> str:
+    def get_system_recommendation(self) -> Dict[str, Any]:
         """
-        Determines the best Gemma 4 variant based on available system RAM.
-        Thresholds are based on model sizes and typical overhead.
+        Determines the best Gemma 4 variant and returns system hardware context.
         """
         total_ram_gb = psutil.virtual_memory().total / (1024**3)
-        logger.debug("hardware_info", total_ram_gb=total_ram_gb)
-
+        cpu_count = psutil.cpu_count()
+        
         if total_ram_gb < 16:
-            return "gemma4:e2b"
+            model = "gemma4:e2b"
         elif total_ram_gb < 32:
-            return "gemma4:e4b"
+            model = "gemma4:e4b"
         elif total_ram_gb < 64:
-            return "gemma4:26b"
+            model = "gemma4:26b"
         else:
-            return "gemma4:31b"
+            model = "gemma4:31b"
+            
+        return {
+            "recommended_model": model,
+            "total_ram_gb": round(total_ram_gb, 1),
+            "cpu_count": cpu_count
+        }
+
+    def get_recommended_model(self) -> str:
+        """Legacy wrapper returning just the model name."""
+        return self.get_system_recommendation()["recommended_model"]
 
     async def ensure_model_pulled(self, model_name: str) -> None:
         """

@@ -18,7 +18,7 @@ export const AuraCoreAPI = {
     return await invoke("health");
   },
 
-  async getRecommendedModel(): Promise<{ recommended_model: string }> {
+  async getRecommendedModel(): Promise<{ recommended_model: string; total_ram_gb: number; cpu_count: number }> {
     return await invoke("recommend_model");
   },
 
