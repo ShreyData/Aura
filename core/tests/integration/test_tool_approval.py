@@ -14,6 +14,7 @@ from aura.tools.registry import get_tool_registry, reset_tool_registry
 from aura.events import get_event_bus, reset_event_bus
 from aura.ollama.client import ToolCallDetected
 
+
 # Mocking the OllamaClient for tool detection
 class MockOllamaClient:
     def __init__(self):
@@ -29,11 +30,12 @@ class MockOllamaClient:
             raise ToolCallDetected(
                 tool_name="write_file",
                 tool_args={"path": "test.txt", "content": "hello"},
-                partial_response="Writing to file..."
+                partial_response="Writing to file...",
             )
         else:
             # Simulate final response after tool execution
             yield "File written successfully."
+
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_teardown():
@@ -41,28 +43,29 @@ async def setup_teardown():
     reset_approval_gate()
     reset_tool_registry()
     reset_event_bus()
-    
+
     # Manually populate app state for tests
     bus = get_event_bus()
     registry = get_tool_registry()
     gate = get_approval_gate()
-    
+
     app.state.event_bus = bus
     app.state.tool_registry = registry
     app.state.approval_gate = gate
-    
+
     # Start the event bus dispatch loop manually since lifespan doesn't run in ASGITransport
     dispatch_task = asyncio.create_task(bus.dispatch_loop())
-    
+
     app.dependency_overrides.clear()
     yield
     app.dependency_overrides.clear()
-    
+
     dispatch_task.cancel()
     try:
         await dispatch_task
     except asyncio.CancelledError:
         pass
+
 
 @pytest.mark.asyncio
 async def test_tool_approval_flow_approved():
@@ -73,7 +76,7 @@ async def test_tool_approval_flow_approved():
     mock_ollama = MockOllamaClient()
     gate = app.state.approval_gate
     bus = app.state.event_bus
-    
+
     app.dependency_overrides[get_ollama_client_dep] = lambda: mock_ollama
     app.dependency_overrides[get_approval_gate_dep] = lambda: gate
 
@@ -88,25 +91,29 @@ async def test_tool_approval_flow_approved():
     await bus.subscribe("tool_approval_needed", on_approval_needed)
 
     try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
             # Background task to approve the tool call once it hits the bus
             async def auto_approve():
                 await asyncio.wait_for(approval_needed_event.wait(), timeout=5.0)
-                await ac.post("/v1/tools/approve", json={
-                    "request_id": captured_request_id, 
-                    "approved": True
-                })
+                await ac.post(
+                    "/v1/tools/approve",
+                    json={"request_id": captured_request_id, "approved": True},
+                )
 
             approve_task = asyncio.create_task(auto_approve())
 
             chat_payload = {
                 "model": "gemma",
                 "messages": [{"role": "user", "content": "write hello to test.txt"}],
-                "stream": True
+                "stream": True,
             }
-            
+
             full_text = ""
-            async with ac.stream("POST", "/v1/chat/completions", json=chat_payload) as response:
+            async with ac.stream(
+                "POST", "/v1/chat/completions", json=chat_payload
+            ) as response:
                 assert response.status_code == 200
                 async for line in response.aiter_lines():
                     if line.startswith("data: ") and not line.endswith("[DONE]"):
@@ -115,8 +122,9 @@ async def test_tool_approval_flow_approved():
                             content = chunk["choices"][0]["delta"].get("content", "")
                             if content:
                                 full_text += content
-                        except: continue
-            
+                        except:
+                            continue
+
             await approve_task
             assert "File written successfully" in full_text
     finally:
@@ -132,7 +140,7 @@ async def test_tool_approval_flow_denied():
     mock_ollama = MockOllamaClient()
     gate = app.state.approval_gate
     bus = app.state.event_bus
-    
+
     app.dependency_overrides[get_ollama_client_dep] = lambda: mock_ollama
     app.dependency_overrides[get_approval_gate_dep] = lambda: gate
 
@@ -147,28 +155,33 @@ async def test_tool_approval_flow_denied():
     await bus.subscribe("tool_approval_needed", on_approval_needed)
 
     try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+
             async def auto_deny():
                 await asyncio.wait_for(approval_needed_event.wait(), timeout=5.0)
-                await ac.post("/v1/tools/approve", json={
-                    "request_id": captured_request_id, 
-                    "approved": False
-                })
+                await ac.post(
+                    "/v1/tools/approve",
+                    json={"request_id": captured_request_id, "approved": False},
+                )
 
             deny_task = asyncio.create_task(auto_deny())
 
             chat_payload = {
                 "model": "gemma",
                 "messages": [{"role": "user", "content": "write hello to test.txt"}],
-                "stream": True
+                "stream": True,
             }
-            
+
             full_text = ""
-            async with ac.stream("POST", "/v1/chat/completions", json=chat_payload) as response:
+            async with ac.stream(
+                "POST", "/v1/chat/completions", json=chat_payload
+            ) as response:
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
                         full_text += line
-            
+
             await deny_task
             assert "denied by user" in full_text
     finally:
@@ -184,11 +197,18 @@ async def test_tool_approval_timeout():
     mock_ollama = MockOllamaClient()
     app.dependency_overrides[get_ollama_client_dep] = lambda: mock_ollama
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         with patch("asyncio.wait_for", side_effect=asyncio.TimeoutError):
-            resp = await ac.post("/v1/chat/completions", json={
-                "model": "gemma",
-                "messages": [{"role": "user", "content": "write hello to test.txt"}],
-                "stream": False
-            })
+            resp = await ac.post(
+                "/v1/chat/completions",
+                json={
+                    "model": "gemma",
+                    "messages": [
+                        {"role": "user", "content": "write hello to test.txt"}
+                    ],
+                    "stream": False,
+                },
+            )
             assert "denied by user" in resp.text

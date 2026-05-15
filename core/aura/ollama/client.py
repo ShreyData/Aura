@@ -23,7 +23,9 @@ class ToolCallDetected(Exception):
     Raised when a tool call is detected in the Ollama response stream.
     """
 
-    def __init__(self, tool_name: str, tool_args: Dict[str, Any], partial_response: str):
+    def __init__(
+        self, tool_name: str, tool_args: Dict[str, Any], partial_response: str
+    ):
         super().__init__(f"Tool call detected: {tool_name}")
         self.tool_name = tool_name
         self.tool_args = tool_args
@@ -78,7 +80,9 @@ class OllamaClient:
         partial_response = ""
 
         try:
-            async with httpx.AsyncClient(base_url=self.base_url, timeout=None) as client:
+            async with httpx.AsyncClient(
+                base_url=self.base_url, timeout=None
+            ) as client:
                 async with client.stream(
                     "POST", "/api/chat", json=request_data.model_dump(exclude_none=True)
                 ) as response:
@@ -123,33 +127,39 @@ class OllamaClient:
             logger.error("ollama_stream_chat_error", error=str(e))
             raise
 
-    async def pull_model(self, model: str, on_progress: Callable[[Dict[str, Any]], Any]) -> None:
+    async def pull_model(
+        self, model: str, on_progress: Callable[[Dict[str, Any]], Any]
+    ) -> None:
         """
         Download a model. Calls on_progress({ status, percent, completed, total }).
         Supports both sync and async callbacks.
         """
         try:
-            async with httpx.AsyncClient(base_url=self.base_url, timeout=None) as client:
-                async with client.stream("POST", "/api/pull", json={"name": model}) as response:
+            async with httpx.AsyncClient(
+                base_url=self.base_url, timeout=None
+            ) as client:
+                async with client.stream(
+                    "POST", "/api/pull", json={"name": model}
+                ) as response:
                     async for line in response.aiter_lines():
                         if not line:
                             continue
-                        
+
                         data = json.loads(line)
                         progress = OllamaPullProgress(**data)
-                        
+
                         # Calculate percentage if total is available
                         percent = 0
                         if progress.total and progress.completed:
                             percent = int((progress.completed / progress.total) * 100)
-                        
+
                         payload = {
                             "status": progress.status,
                             "percent": percent,
                             "completed": progress.completed,
-                            "total": progress.total
+                            "total": progress.total,
                         }
-                        
+
                         if asyncio.iscoroutinefunction(on_progress):
                             await on_progress(payload)
                         else:
@@ -177,7 +187,9 @@ class OllamaClient:
         """
         try:
             async with httpx.AsyncClient(base_url=self.base_url) as client:
-                response = await client.request("DELETE", "/api/delete", json={"name": model})
+                response = await client.request(
+                    "DELETE", "/api/delete", json={"name": model}
+                )
                 response.raise_for_status()
                 logger.info("ollama_model_deleted", model=model)
         except Exception as e:
@@ -191,7 +203,9 @@ class OllamaClient:
         request_data = OllamaEmbedRequest(model=model, input=text)
         try:
             async with httpx.AsyncClient(base_url=self.base_url) as client:
-                response = await client.post("/api/embed", json=request_data.model_dump(exclude_none=True))
+                response = await client.post(
+                    "/api/embed", json=request_data.model_dump(exclude_none=True)
+                )
                 response.raise_for_status()
                 data = OllamaEmbedResponse(**response.json())
                 # Return the first embedding (since we only passed one string)

@@ -1,7 +1,7 @@
 import sys
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Tuple, Type
+from typing import Tuple, Type
 
 from pydantic_settings import (
     BaseSettings,
@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     require_approval_medium: bool = True
     log_level: str = "INFO"
     auto_unload_minutes: int = 5
+    rag_db_path: Path = Path.home() / ".aura" / "knowledge.db"
 
     model_config = SettingsConfigDict(
         env_prefix="AURA_",
@@ -61,10 +62,14 @@ class Settings(BaseSettings):
         sources: list[PydanticBaseSettingsSource] = [init_settings, env_settings]
 
         if user_config_path.exists():
-            sources.append(TomlConfigSettingsSource(settings_cls, toml_file=user_config_path))
+            sources.append(
+                TomlConfigSettingsSource(settings_cls, toml_file=user_config_path)
+            )
 
         if project_defaults_path.exists():
-            sources.append(TomlConfigSettingsSource(settings_cls, toml_file=project_defaults_path))
+            sources.append(
+                TomlConfigSettingsSource(settings_cls, toml_file=project_defaults_path)
+            )
 
         return tuple(sources)
 

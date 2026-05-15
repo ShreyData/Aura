@@ -25,12 +25,15 @@ def get_platform() -> PlatformAdapter:
 
     if platform == "win32":
         from aura.platform.windows import WindowsAdapter
+
         _instance = WindowsAdapter()
     elif platform == "darwin":
         from aura.platform.macos import MacOSAdapter
+
         _instance = MacOSAdapter()
     elif platform.startswith("linux"):
         from aura.platform.linux import LinuxAdapter
+
         _instance = LinuxAdapter()
     else:
         logger.error("unsupported_platform", platform=platform)

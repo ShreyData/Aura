@@ -54,17 +54,17 @@ class LinuxAdapter(PlatformAdapter):
         try:
             d = display.Display()
             root = d.screen().root
-            
+
             # Get the ID of the active window from the _NET_ACTIVE_WINDOW property
             active_window_id_prop = d.intern_atom("_NET_ACTIVE_WINDOW")
             res = root.get_full_property(active_window_id_prop, X.AnyPropertyType)
-            
+
             if not res or not res.value:
                 return "Unknown"
-                
+
             window_id = res.value[0]
             window_obj = d.create_resource_object("window", window_id)
-            
+
             # Try to get the window name (_NET_WM_NAME or WM_NAME)
             for atom_name in ["_NET_WM_NAME", "WM_NAME"]:
                 atom = d.intern_atom(atom_name)
@@ -73,7 +73,7 @@ class LinuxAdapter(PlatformAdapter):
                     if isinstance(name_res.value, bytes):
                         return name_res.value.decode("utf-8", errors="ignore")
                     return str(name_res.value)
-                    
+
             return "Unknown"
         except Exception as e:
             logger.error("linux_get_active_window_failed", error=str(e))
@@ -97,7 +97,9 @@ class LinuxAdapter(PlatformAdapter):
         """
         try:
             # xdg-open is the standard Linux way to open files or apps
-            subprocess.run(["xdg-open", name], check=True, shell=False, capture_output=True)
+            subprocess.run(
+                ["xdg-open", name], check=True, shell=False, capture_output=True
+            )
             return True
         except Exception as e:
             logger.error("linux_open_app_failed", name=name, error=str(e))
@@ -125,11 +127,11 @@ class LinuxAdapter(PlatformAdapter):
             item = "org.freedesktop.Notifications"
             path = "/org/freedesktop/Notifications"
             interface = "org.freedesktop.Notifications"
-            
+
             bus = dbus.SessionBus()
             notif = bus.get_object(item, path)
             notify_interface = dbus.Interface(notif, interface)
-            
+
             # Notify(app_name, replaces_id, app_icon, summary, body, actions, hints, expire_timeout)
             notify_interface.Notify("Aura", 0, "", title, body, [], {}, -1)
         except Exception as e:
@@ -141,7 +143,7 @@ class LinuxAdapter(PlatformAdapter):
         On X11, uses Xlib. On Wayland, returns a basic list via sysfs or placeholder.
         """
         displays = []
-        
+
         if self.is_wayland:
             # Wayland display info is harder to query directly from Python
             # We return a generic placeholder for now
@@ -154,17 +156,19 @@ class LinuxAdapter(PlatformAdapter):
             d = display.Display()
             for i in range(d.screen_count()):
                 screen = d.screen(i)
-                displays.append({
-                    "id": f"x11-{i}",
-                    "resolution": {
-                        "width": screen.width_in_pixels,
-                        "height": screen.height_in_pixels
-                    },
-                    "is_primary": i == 0
-                })
+                displays.append(
+                    {
+                        "id": f"x11-{i}",
+                        "resolution": {
+                            "width": screen.width_in_pixels,
+                            "height": screen.height_in_pixels,
+                        },
+                        "is_primary": i == 0,
+                    }
+                )
         except Exception as e:
             logger.error("linux_get_display_info_failed", error=str(e))
-            
+
         return displays
 
     def lock_screen(self) -> None:
@@ -197,14 +201,14 @@ class LinuxAdapter(PlatformAdapter):
         try:
             d = display.Display()
             root = d.screen().root
-            
+
             # Find the window
             window_id_prop = d.intern_atom("_NET_CLIENT_LIST")
             res = root.get_full_property(window_id_prop, X.AnyPropertyType)
-            
+
             if not res or not res.value:
                 return False
-                
+
             for window_id in res.value:
                 window_obj = d.create_resource_object("window", window_id)
                 for atom_name in ["_NET_WM_NAME", "WM_NAME"]:
@@ -216,16 +220,20 @@ class LinuxAdapter(PlatformAdapter):
                             name = name_res.value.decode("utf-8", errors="ignore")
                         else:
                             name = str(name_res.value)
-                        
+
                         if title.lower() in name.lower():
                             # Focus the window
                             active_atom = d.intern_atom("_NET_ACTIVE_WINDOW")
                             ev = display.event.ClientMessage(
                                 window=window_obj,
                                 client_type=active_atom,
-                                data=(32, [1, X.CurrentTime, 0, 0, 0])
+                                data=(32, [1, X.CurrentTime, 0, 0, 0]),
                             )
-                            root.send_event(ev, event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask)
+                            root.send_event(
+                                ev,
+                                event_mask=X.SubstructureRedirectMask
+                                | X.SubstructureNotifyMask,
+                            )
                             d.display.sync()
                             return True
             return False
@@ -240,16 +248,16 @@ class LinuxAdapter(PlatformAdapter):
         """
         if self.is_wayland:
             return 0.0
-            
+
         if not display or not saver:
             return 0.0
-            
+
         try:
             d = display.Display()
             # Verify the extension is available
             if not d.has_extension("MIT-SCREEN-SAVER"):
                 return 0.0
-                
+
             info = saver.query_info(d.screen().root)
             # msSinceLastInput is the field in XScreenSaverQueryInfo
             return float(info.idle) / 1000.0

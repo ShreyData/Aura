@@ -30,7 +30,11 @@ class ApprovalGate:
         return self._lock
 
     async def request_approval(
-        self, tool_name: str, description: str, args: Dict[str, Any], risk_level: RiskLevel
+        self,
+        tool_name: str,
+        description: str,
+        args: Dict[str, Any],
+        risk_level: RiskLevel,
     ) -> bool:
         """
         Creates a pending approval request and waits for a response or timeout.
@@ -38,7 +42,7 @@ class ApprovalGate:
         """
         request_id = str(uuid.uuid4())
         event = asyncio.Event()
-        
+
         pending_call = PendingToolCall(
             request_id=request_id,
             tool_name=tool_name,
@@ -65,13 +69,15 @@ class ApprovalGate:
         try:
             # Wait for 60 seconds for a response
             await asyncio.wait_for(event.wait(), timeout=60.0)
-            
+
             async with lock:
                 _, approved, _ = self._pending.get(request_id, (None, False, None))
                 return approved
 
         except asyncio.TimeoutError:
-            logger.warning("tool_approval_timeout", request_id=request_id, tool_name=tool_name)
+            logger.warning(
+                "tool_approval_timeout", request_id=request_id, tool_name=tool_name
+            )
             return False
         finally:
             # Always clean up the pending request
@@ -86,19 +92,21 @@ class ApprovalGate:
         lock = await self._get_lock()
         async with lock:
             if request_id not in self._pending:
-                logger.warning("tool_approval_response_invalid_id", request_id=request_id)
+                logger.warning(
+                    "tool_approval_response_invalid_id", request_id=request_id
+                )
                 return False
 
             event, _, pending_call = self._pending[request_id]
             self._pending[request_id] = (event, approved, pending_call)
-            
+
             logger.info(
                 "tool_approval_responded",
                 request_id=request_id,
                 approved=approved,
                 tool_name=pending_call.tool_name,
             )
-            
+
             event.set()
             return True
 

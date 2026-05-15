@@ -32,13 +32,13 @@ class VoiceOrchestrator:
     def __init__(self) -> None:
         self.config = get_config()
         self.event_bus = get_event_bus()
-        
+
         # IO Components
         self.audio = AudioStreamer()
         self.vad = SileroVAD()
         self.stt = WhisperSTT()
         self.tts = KokoroTTS()
-        
+
         self.state = VoiceState.IDLE
         self._task: Optional[asyncio.Task] = None
         self._stop_event = asyncio.Event()
@@ -69,7 +69,7 @@ class VoiceOrchestrator:
         """Updates the state and publishes an orb_state event."""
         if self.state == state:
             return
-        
+
         self.state = state
         logger.info("voice_state_changed", state=state.value)
         await self.event_bus.publish("orb_state", {"state": state.value})
@@ -84,7 +84,7 @@ class VoiceOrchestrator:
         speech_detected = False
         silence_start_time = None
         speech_start_time = None
-        
+
         # Minimum durations for stability
         MIN_SPEECH_MS = 300
         MAX_SILENCE_MS = 800
@@ -97,18 +97,18 @@ class VoiceOrchestrator:
                 # Note: For better VAD we should probably process chunks of 50-100ms
                 # but get_buffer() returns the whole 10s. We take the last 100ms chunk.
                 full_buffer = self.audio.get_buffer()
-                
+
                 # Sample rate is 16000, 100ms is 1600 samples
                 CHUNK_SIZE = 1600
                 if len(full_buffer) < CHUNK_SIZE:
                     await asyncio.sleep(0.05)
                     continue
-                
+
                 latest_chunk = full_buffer[-CHUNK_SIZE:]
-                
+
                 # 2. Check for speech
                 is_speech = await self.vad.is_speech(latest_chunk.tobytes())
-                
+
                 current_time = asyncio.get_event_loop().time()
 
                 if is_speech:
@@ -121,15 +121,20 @@ class VoiceOrchestrator:
                     if speech_detected:
                         if silence_start_time is None:
                             silence_start_time = current_time
-                        
+
                         # Check if silence has lasted long enough to trigger STT
                         silence_duration = (current_time - silence_start_time) * 1000
                         speech_duration = (current_time - speech_start_time) * 1000
-                        
-                        if silence_duration > MAX_SILENCE_MS and speech_duration > MIN_SPEECH_MS:
-                            logger.info("speech_finished", duration_ms=round(speech_duration))
+
+                        if (
+                            silence_duration > MAX_SILENCE_MS
+                            and speech_duration > MIN_SPEECH_MS
+                        ):
+                            logger.info(
+                                "speech_finished", duration_ms=round(speech_duration)
+                            )
                             await self._process_speech()
-                            
+
                             # Reset for next interaction
                             speech_detected = False
                             silence_start_time = None
@@ -151,10 +156,10 @@ class VoiceOrchestrator:
         Executes the THINKING and SPEAKING phases of the loop.
         """
         await self._set_state(VoiceState.THINKING)
-        
+
         # 1. Get full speech buffer
         audio_data = self.audio.get_buffer()
-        
+
         # 2. Transcribe
         text = await self.stt.transcribe(audio_data)
         if not text:
@@ -166,18 +171,22 @@ class VoiceOrchestrator:
         # 3. Call LLM (via local API to reuse tool logic)
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
-                api_url = f"http://127.0.0.1:{self.config.core_port}/v1/chat/completions"
-                
+                api_url = (
+                    f"http://127.0.0.1:{self.config.core_port}/v1/chat/completions"
+                )
+
                 # For now, we don't have long-term history passed in here
                 # In Phase 5, we'll fetch context from history.py
                 request_payload = {
                     "model": self.config.default_model,
                     "messages": [{"role": "user", "content": text}],
-                    "stream": True
+                    "stream": True,
                 }
-                
+
                 full_response = ""
-                async with client.stream("POST", api_url, json=request_payload) as response:
+                async with client.stream(
+                    "POST", api_url, json=request_payload
+                ) as response:
                     if response.status_code != 200:
                         logger.error("api_call_failed", status=response.status_code)
                         return
@@ -189,13 +198,13 @@ class VoiceOrchestrator:
                             continue
                         if "[DONE]" in line:
                             break
-                        
+
                         try:
                             chunk = json.loads(line[6:])
                             content = chunk["choices"][0]["delta"].get("content", "")
                             full_response += content
                             current_sentence += content
-                            
+
                             # Simple sentence splitting logic
                             if any(punct in content for punct in [".", "!", "?", "\n"]):
                                 if current_sentence.strip():
@@ -205,13 +214,13 @@ class VoiceOrchestrator:
                                     current_sentence = ""
                         except (json.JSONDecodeError, KeyError, IndexError):
                             continue
-                    
+
                     # Speak remaining fragment
                     if current_sentence.strip():
                         await self._set_state(VoiceState.SPEAKING)
                         await self.tts.speak(current_sentence.strip())
 
                 logger.info("voice_response_completed", response=full_response)
-                
+
         except Exception as e:
             logger.error("voice_thinking_failed", error=str(e))

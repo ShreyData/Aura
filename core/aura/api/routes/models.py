@@ -1,14 +1,13 @@
 import asyncio
 import json
-from typing import Annotated, Any, Dict, List
+from typing import Annotated, Any, Dict
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from aura.api.deps import get_ollama_client, get_ollama_manager, get_event_bus
-from aura.config import get_config
 from aura.events import EventBus
 from aura.ollama.client import OllamaClient
 from aura.ollama.manager import OllamaManager
@@ -16,8 +15,10 @@ from aura.ollama.manager import OllamaManager
 router = APIRouter()
 logger = structlog.get_logger()
 
+
 class ModelPullRequest(BaseModel):
     model: str
+
 
 @router.get("/v1/models")
 async def list_models(
@@ -29,13 +30,14 @@ async def list_models(
     """
     models = await ollama_client.list_models()
     status = await ollama_manager.get_model_status()
-    
+
     return {
         "models": models,
         "active_model": status.get("model"),
         "active_model_vram": status.get("size_vram", 0),
-        "status": status
+        "status": status,
     }
+
 
 @router.get("/v1/models/recommend")
 async def recommend_model(
@@ -45,6 +47,7 @@ async def recommend_model(
     Returns a hardware-aware model recommendation and system context.
     """
     return ollama_manager.get_system_recommendation()
+
 
 @router.post("/v1/models/pull")
 async def pull_model(
@@ -56,13 +59,14 @@ async def pull_model(
     Downloads a model from the Ollama library.
     Streams progress as SSE events and publishes to the event bus for WebSocket clients.
     """
+
     async def progress_generator():
         queue = asyncio.Queue()
 
         async def on_progress(data: Dict[str, Any]) -> None:
             # Wrap callback data into a thread-safe-ish queue for the generator
             queue.put_nowait(data)
-            
+
             # Also publish to the event bus for WebSocket clients
             event_payload = {
                 "model": request.model,
@@ -74,14 +78,16 @@ async def pull_model(
             await event_bus.publish("model_pull_progress", event_payload)
 
         # Start the pull operation
-        pull_task = asyncio.create_task(ollama_client.pull_model(request.model, on_progress))
+        pull_task = asyncio.create_task(
+            ollama_client.pull_model(request.model, on_progress)
+        )
 
         try:
             while not pull_task.done() or not queue.empty():
                 try:
                     # Wait for progress data
                     progress = await asyncio.wait_for(queue.get(), timeout=0.1)
-                    
+
                     # Format as the WebSocket event shape defined in API_Contract.md
                     event = {
                         "type": "model_pull_progress",
@@ -91,7 +97,7 @@ async def pull_model(
                             "percent": progress.get("percent"),
                             "completed": progress.get("completed"),
                             "total": progress.get("total"),
-                        }
+                        },
                     }
                     yield f"data: {json.dumps(event)}\n\n"
                     queue.task_done()
@@ -99,15 +105,16 @@ async def pull_model(
                     if pull_task.done():
                         break
                     continue
-            
+
             # Ensure we catch any exceptions from the task
             await pull_task
-            
+
         except Exception as e:
             logger.error("model_pull_stream_error", model=request.model, error=str(e))
             yield f"data: {json.dumps({'type': 'error', 'payload': {'message': str(e)}})}\n\n"
 
     return StreamingResponse(progress_generator(), media_type="text/event-stream")
+
 
 @router.delete("/v1/models/{name}")
 async def delete_model(

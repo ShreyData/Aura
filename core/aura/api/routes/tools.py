@@ -12,7 +12,7 @@ router = APIRouter(prefix="/v1/tools", tags=["tools"])
 
 @router.get("")
 async def list_tools(
-    registry: Annotated[ToolRegistry, Depends(get_tool_registry)]
+    registry: Annotated[ToolRegistry, Depends(get_tool_registry)],
 ) -> List[Dict[str, Any]]:
     """
     Returns a list of all registered and available tools with their
@@ -23,7 +23,7 @@ async def list_tools(
 
 @router.get("/schemas")
 async def get_tool_schemas(
-    registry: Annotated[ToolRegistry, Depends(get_tool_registry)]
+    registry: Annotated[ToolRegistry, Depends(get_tool_registry)],
 ) -> List[Dict[str, Any]]:
     """
     Returns the JSON schemas for all available tools, ready for
@@ -34,7 +34,7 @@ async def get_tool_schemas(
 
 @router.get("/pending")
 async def list_pending_tools(
-    gate: Annotated[ApprovalGate, Depends(get_approval_gate)]
+    gate: Annotated[ApprovalGate, Depends(get_approval_gate)],
 ) -> List[PendingToolCall]:
     """
     Returns a list of all tool calls currently awaiting user approval.
@@ -45,7 +45,7 @@ async def list_pending_tools(
 @router.post("/approve")
 async def approve_tool(
     request: ToolApprovalRequest,
-    gate: Annotated[ApprovalGate, Depends(get_approval_gate)]
+    gate: Annotated[ApprovalGate, Depends(get_approval_gate)],
 ) -> Dict[str, Any]:
     """
     Processes a user's response (approve/deny) for a pending tool call.
@@ -53,8 +53,8 @@ async def approve_tool(
     success = await gate.respond(request.request_id, request.approved)
     if not success:
         raise HTTPException(
-            status_code=404, 
-            detail=f"Pending tool call with ID '{request.request_id}' not found."
+            status_code=404,
+            detail=f"Pending tool call with ID '{request.request_id}' not found.",
         )
-    
+
     return {"status": "success", "message": "Tool approval response processed."}

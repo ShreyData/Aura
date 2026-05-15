@@ -5,6 +5,7 @@ from aura.platform.factory import get_platform
 
 logger = structlog.get_logger()
 
+
 @register_tool
 class SendNotificationTool(Tool):
     name = "send_notification"
@@ -15,9 +16,12 @@ class SendNotificationTool(Tool):
         "type": "object",
         "properties": {
             "title": {"type": "string", "description": "The title of the notification"},
-            "body": {"type": "string", "description": "The body text of the notification"}
+            "body": {
+                "type": "string",
+                "description": "The body text of the notification",
+            },
         },
-        "required": ["title", "body"]
+        "required": ["title", "body"],
     }
 
     async def execute(self, title: str, body: str) -> ToolResult:

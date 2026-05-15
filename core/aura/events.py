@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Awaitable, Callable, Dict, Optional, Set, Tuple
 
 import structlog
 
@@ -91,7 +91,7 @@ class EventBus:
         logger.info("event_bus_dispatch_loop_started")
         queue = self._get_queue()
         lock = await self._get_lock()
-        
+
         try:
             while True:
                 event_type, payload = await queue.get()

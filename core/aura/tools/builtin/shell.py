@@ -1,5 +1,5 @@
 import subprocess
-from typing import Any, Dict, List
+from typing import List
 
 import structlog
 
@@ -18,6 +18,7 @@ COMMAND_BLOCKLIST = [
     "del /f /s",
 ]
 
+
 @register_tool
 class RunCommandTool(Tool):
     name = "run_command"
@@ -34,10 +35,10 @@ class RunCommandTool(Tool):
             "args": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "The command and its arguments as a list (e.g., ['ls', '-la'])"
+                "description": "The command and its arguments as a list (e.g., ['ls', '-la'])",
             }
         },
-        "required": ["args"]
+        "required": ["args"],
     }
 
     async def execute(self, args: List[str]) -> ToolResult:
@@ -53,13 +54,13 @@ class RunCommandTool(Tool):
                 return ToolResult(
                     success=False,
                     output=None,
-                    error=f"Security Error: The command '{blocked}' is strictly forbidden."
+                    error=f"Security Error: The command '{blocked}' is strictly forbidden.",
                 )
 
         # 2. Execution
         try:
             logger.info("executing_shell_command", command=args)
-            
+
             # shell=False is mandatory to prevent injection
             # timeout=30.0 prevents long-running or hanging processes
             result = subprocess.run(
@@ -68,19 +69,19 @@ class RunCommandTool(Tool):
                 text=True,
                 shell=False,
                 timeout=30.0,
-                check=False  # We want to return exit code and stderr even if it fails
+                check=False,  # We want to return exit code and stderr even if it fails
             )
 
             output = {
                 "stdout": result.stdout,
                 "stderr": result.stderr,
-                "returncode": result.returncode
+                "returncode": result.returncode,
             }
 
             return ToolResult(
                 success=(result.returncode == 0),
                 output=output,
-                error=result.stderr if result.returncode != 0 else None
+                error=result.stderr if result.returncode != 0 else None,
             )
 
         except subprocess.TimeoutExpired:
@@ -88,19 +89,17 @@ class RunCommandTool(Tool):
             return ToolResult(
                 success=False,
                 output=None,
-                error="Execution failed: The command timed out after 30 seconds."
+                error="Execution failed: The command timed out after 30 seconds.",
             )
         except FileNotFoundError:
             logger.error("command_not_found", command=args[0])
             return ToolResult(
                 success=False,
                 output=None,
-                error=f"Execution failed: The command '{args[0]}' was not found."
+                error=f"Execution failed: The command '{args[0]}' was not found.",
             )
         except Exception as e:
             logger.error("command_execution_error", command=args, error=str(e))
             return ToolResult(
-                success=False,
-                output=None,
-                error=f"Execution failed: {str(e)}"
+                success=False, output=None, error=f"Execution failed: {str(e)}"
             )

@@ -1,13 +1,12 @@
 import asyncio
 import json
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import structlog
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from aura.api.deps import get_ollama_client
-from aura.api.schemas import ChatCompletionRequest, ChatMessage
 from aura.config import get_config
 from aura.events import EventBus, get_event_bus
 from aura.io.prompt_composer import build_messages
@@ -29,7 +28,9 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
         self.active_connections[websocket] = {}
-        logger.info("websocket_connected", total_connections=len(self.active_connections))
+        logger.info(
+            "websocket_connected", total_connections=len(self.active_connections)
+        )
 
     def disconnect(self, websocket: WebSocket) -> None:
         if websocket in self.active_connections:
@@ -38,9 +39,13 @@ class ConnectionManager:
                 if not task.done():
                     task.cancel()
             del self.active_connections[websocket]
-            logger.info("websocket_disconnected", total_connections=len(self.active_connections))
+            logger.info(
+                "websocket_disconnected", total_connections=len(self.active_connections)
+            )
 
-    async def send_personal_message(self, message: Dict[str, Any], websocket: WebSocket) -> None:
+    async def send_personal_message(
+        self, message: Dict[str, Any], websocket: WebSocket
+    ) -> None:
         try:
             await websocket.send_json(message)
         except Exception as e:
@@ -57,12 +62,17 @@ class ConnectionManager:
                 # If sending fails, the connection might be dead; it will be cleaned up by the loop
                 pass
 
-    def register_task(self, websocket: WebSocket, request_id: str, task: asyncio.Task) -> None:
+    def register_task(
+        self, websocket: WebSocket, request_id: str, task: asyncio.Task
+    ) -> None:
         if websocket in self.active_connections:
             self.active_connections[websocket][request_id] = task
 
     def cancel_task(self, websocket: WebSocket, request_id: str) -> bool:
-        if websocket in self.active_connections and request_id in self.active_connections[websocket]:
+        if (
+            websocket in self.active_connections
+            and request_id in self.active_connections[websocket]
+        ):
             task = self.active_connections[websocket][request_id]
             if not task.done():
                 task.cancel()
@@ -112,13 +122,18 @@ async def websocket_endpoint(
                 payload = message.get("payload", {})
             except json.JSONDecodeError:
                 await manager.send_personal_message(
-                    {"type": "error", "payload": {"code": "invalid_json", "message": "Invalid JSON"}},
+                    {
+                        "type": "error",
+                        "payload": {"code": "invalid_json", "message": "Invalid JSON"},
+                    },
                     websocket,
                 )
                 continue
 
             if msg_type == "ping":
-                await manager.send_personal_message({"type": "pong", "payload": {}}, websocket)
+                await manager.send_personal_message(
+                    {"type": "pong", "payload": {}}, websocket
+                )
 
             elif msg_type == "chat":
                 request_id = payload.get("request_id") or str(uuid.uuid4())
@@ -128,7 +143,9 @@ async def websocket_endpoint(
 
                 # Start chat as a background task so we can receive other messages (like cancel)
                 task = asyncio.create_task(
-                    handle_ws_chat(websocket, request_id, model, messages, ollama, event_bus)
+                    handle_ws_chat(
+                        websocket, request_id, model, messages, ollama, event_bus
+                    )
                 )
                 manager.register_task(websocket, request_id, task)
 
@@ -136,7 +153,9 @@ async def websocket_endpoint(
                 request_id = payload.get("request_id")
                 if request_id:
                     cancelled = manager.cancel_task(websocket, request_id)
-                    logger.info("ws_chat_cancelled", request_id=request_id, success=cancelled)
+                    logger.info(
+                        "ws_chat_cancelled", request_id=request_id, success=cancelled
+                    )
                 else:
                     logger.warning("ws_cancel_missing_request_id")
 
@@ -172,21 +191,28 @@ async def handle_ws_chat(
         try:
             async for token in ollama.stream_chat(model=model, messages=final_messages):
                 await manager.send_personal_message(
-                    {"type": "chat_chunk", "payload": {"delta": token, "request_id": request_id}},
+                    {
+                        "type": "chat_chunk",
+                        "payload": {"delta": token, "request_id": request_id},
+                    },
                     websocket,
                 )
         except ToolCallDetected as e:
-            # For Phase 1, we log and signal but complex multi-turn WS tool calls 
-            # might need a more robust state machine. 
+            # For Phase 1, we log and signal but complex multi-turn WS tool calls
+            # might need a more robust state machine.
             # Here we follow the simple path: notify the UI.
             await manager.send_personal_message(
                 {
                     "type": "tool_call_start",
-                    "payload": {"tool_name": e.tool_name, "args": e.tool_args, "request_id": request_id},
+                    "payload": {
+                        "tool_name": e.tool_name,
+                        "args": e.tool_args,
+                        "request_id": request_id,
+                    },
                 },
                 websocket,
             )
-            # Re-raise or handle approval flow if needed. 
+            # Re-raise or handle approval flow if needed.
             # For now, we terminate this WS chat task and expect the UI to handle tool flow via REST/Events.
             logger.info("ws_tool_call_detected", tool_name=e.tool_name)
 

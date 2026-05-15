@@ -16,17 +16,17 @@ def build_messages(
 ) -> List[Dict[str, Any]]:
     """
     Synthesizes the final message list for Ollama inference.
-    
+
     - Injects tool schemas into the system prompt in XML format.
     - Prepends RAG context as a system message.
     - Attaches screen capture to the images array of the last user message.
     """
     final_messages = [dict(m) for m in messages]
-    
+
     # 1. Extract Base64 from ScreenCapture or raw string
     base64_image = None
     has_screenshot = False
-    
+
     if isinstance(screen_capture, ScreenCapture):
         base64_image = screen_capture.base64_jpeg
         has_screenshot = True
@@ -65,11 +65,15 @@ def build_messages(
         system_content += "Available Tools:\n"
         system_content += "<tools>\n"
         for tool in tool_schemas:
-            system_content += f"  <tool>\n"
+            system_content += "  <tool>\n"
             system_content += f"    <name>{tool.get('name')}</name>\n"
-            system_content += f"    <description>{tool.get('description')}</description>\n"
-            system_content += f"    <parameters>{json.dumps(tool.get('parameters'))}</parameters>\n"
-            system_content += f"  </tool>\n"
+            system_content += (
+                f"    <description>{tool.get('description')}</description>\n"
+            )
+            system_content += (
+                f"    <parameters>{json.dumps(tool.get('parameters'))}</parameters>\n"
+            )
+            system_content += "  </tool>\n"
         system_content += "</tools>\n\n"
         system_content += (
             "To call a tool, output a JSON object in the format: "
@@ -88,9 +92,9 @@ def build_messages(
     # We want system instructions at the very top.
     # If there's already a system message in the history, we merge.
     # Otherwise, we prepend our generated one.
-    
+
     combined_system_message = system_content + context_content
-    
+
     # Check if the first message is a system message
     if final_messages and final_messages[0].get("role") == "system":
         # Prepend our logic to their existing system message

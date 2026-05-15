@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import psutil
 import structlog
@@ -23,7 +23,7 @@ class OllamaManager:
         """
         total_ram_gb = psutil.virtual_memory().total / (1024**3)
         cpu_count = psutil.cpu_count()
-        
+
         if total_ram_gb < 16:
             model = "gemma4:e2b"
         elif total_ram_gb < 32:
@@ -32,11 +32,11 @@ class OllamaManager:
             model = "gemma4:26b"
         else:
             model = "gemma4:31b"
-            
+
         return {
             "recommended_model": model,
             "total_ram_gb": round(total_ram_gb, 1),
-            "cpu_count": cpu_count
+            "cpu_count": cpu_count,
         }
 
     def get_recommended_model(self) -> str:
@@ -50,11 +50,14 @@ class OllamaManager:
         models = await self.client.list_models()
         # model['name'] often includes the ':latest' tag if not specified
         existing_names = {m["name"] for m in models}
-        
+
         # Check for exact match or name:latest match
-        if model_name not in existing_names and f"{model_name}:latest" not in existing_names:
+        if (
+            model_name not in existing_names
+            and f"{model_name}:latest" not in existing_names
+        ):
             logger.info("pulling_missing_model", model=model_name)
-            
+
             def log_progress(progress: Dict[str, Any]) -> None:
                 logger.info(
                     "pull_progress",
@@ -71,7 +74,7 @@ class OllamaManager:
         Returns information about the currently active (loaded) model.
         """
         running_models = await self.client.get_running_models()
-        
+
         if not running_models:
             return {
                 "active": False,

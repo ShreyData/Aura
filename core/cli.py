@@ -40,24 +40,28 @@ def health():
             response = client.get("/health")
             response.raise_for_status()
             data = response.json()
-            
+
             typer.secho("\n--- Aura Health Status ---", bold=True)
-            
+
             aura_status = "ONLINE" if data["aura"] else "OFFLINE"
             aura_color = typer.colors.GREEN if data["aura"] else typer.colors.RED
-            typer.echo(f"Aura Core: ", nl=False)
+            typer.echo("Aura Core: ", nl=False)
             typer.secho(aura_status, fg=aura_color, bold=True)
-            
+
             ollama_status = "ONLINE" if data["ollama"] else "OFFLINE"
             ollama_color = typer.colors.GREEN if data["ollama"] else typer.colors.RED
-            typer.echo(f"Ollama:    ", nl=False)
+            typer.echo("Ollama:    ", nl=False)
             typer.secho(ollama_status, fg=ollama_color, bold=True)
-            
+
             typer.echo(f"Active Model: {data.get('active_model') or 'None'}")
             typer.echo(f"Uptime:       {data['uptime_s']}s\n")
-            
+
     except httpx.ConnectError:
-        typer.secho("\nError: Aura Core is not running. Start it with 'aura serve'.", fg=typer.colors.RED, err=True)
+        typer.secho(
+            "\nError: Aura Core is not running. Start it with 'aura serve'.",
+            fg=typer.colors.RED,
+            err=True,
+        )
         sys.exit(1)
 
 
@@ -67,11 +71,11 @@ def system():
     ram = psutil.virtual_memory()
     total_ram_gb = ram.total / (1024**3)
     available_ram_gb = ram.available / (1024**3)
-    
+
     typer.secho("\n--- System Hardware ---", bold=True)
     typer.echo(f"Total RAM:     {total_ram_gb:.2f} GB")
     typer.echo(f"Available RAM: {available_ram_gb:.2f} GB")
-    
+
     # Recommendation logic (proxied via core if running, otherwise local fallback)
     recommended = None
     try:
@@ -81,7 +85,7 @@ def system():
                 recommended = response.json().get("recommended_model")
     except Exception:
         pass
-        
+
     if not recommended:
         # Fallback to local logic if core is offline
         if total_ram_gb < 16:
@@ -93,7 +97,7 @@ def system():
         else:
             recommended = "gemma4:31b"
 
-    typer.echo(f"Recommended:   ", nl=False)
+    typer.echo("Recommended:   ", nl=False)
     typer.secho(recommended, fg=typer.colors.GREEN, bold=True)
     typer.echo()
 
@@ -102,7 +106,9 @@ def system():
 def chat(
     message: str,
     model: Optional[str] = typer.Option(None, "--model", help="Specify model to use"),
-    no_stream: bool = typer.Option(False, "--no-stream", help="Disable streaming output"),
+    no_stream: bool = typer.Option(
+        False, "--no-stream", help="Disable streaming output"
+    ),
 ):
     """Send a message to Aura and receive a response."""
     selected_model = model or CONFIG.default_model
@@ -111,7 +117,7 @@ def chat(
         "messages": [{"role": "user", "content": message}],
         "stream": not no_stream,
     }
-    
+
     try:
         with httpx.Client(base_url=BASE_URL, timeout=None) as client:
             if no_stream:
@@ -121,7 +127,9 @@ def chat(
                 content = data["choices"][0]["message"]["content"]
                 typer.echo(content)
             else:
-                with client.stream("POST", "/v1/chat/completions", json=payload) as response:
+                with client.stream(
+                    "POST", "/v1/chat/completions", json=payload
+                ) as response:
                     response.raise_for_status()
                     for line in response.iter_lines():
                         if not line:
@@ -131,14 +139,20 @@ def chat(
                                 break
                             try:
                                 chunk = json.loads(line[6:])
-                                content = chunk["choices"][0]["delta"].get("content", "")
+                                content = chunk["choices"][0]["delta"].get(
+                                    "content", ""
+                                )
                                 if content:
                                     print(content, end="", flush=True)
                             except Exception:
                                 continue
                 print()  # Final newline
     except httpx.ConnectError:
-        typer.secho("Error: Aura Core is not running. Start it with 'aura serve'.", fg=typer.colors.RED, err=True)
+        typer.secho(
+            "Error: Aura Core is not running. Start it with 'aura serve'.",
+            fg=typer.colors.RED,
+            err=True,
+        )
         sys.exit(1)
 
 
@@ -150,12 +164,14 @@ def models_list():
             response = client.get("/v1/models")
             response.raise_for_status()
             data = response.json()
-            
+
             models = data.get("models", [])
             active = data.get("active_model")
-            
+
             if not models:
-                typer.echo("No models downloaded yet. Use 'aura models pull <name>' to get one.")
+                typer.echo(
+                    "No models downloaded yet. Use 'aura models pull <name>' to get one."
+                )
                 return
 
             typer.echo(f"\n{'NAME':<30} {'SIZE':<10} {'ID':<15}")
@@ -164,16 +180,16 @@ def models_list():
                 name = m["name"]
                 size_gb = m.get("size", 0) / (1024**3)
                 digest = m.get("digest", "unknown")[:12]
-                
+
                 prefix = "* " if name == active or f"{name}:latest" == active else "  "
                 line = f"{prefix}{name:<28} {size_gb:>6.2f} GB    {digest}"
-                
+
                 if prefix == "* ":
                     typer.secho(line, fg=typer.colors.CYAN, bold=True)
                 else:
                     typer.echo(line)
             typer.echo()
-            
+
     except httpx.ConnectError:
         typer.secho("Error: Aura Core is not running.", fg=typer.colors.RED, err=True)
         sys.exit(1)
@@ -184,7 +200,9 @@ def models_pull(name: str):
     """Download a new model from the library."""
     try:
         with httpx.Client(base_url=BASE_URL, timeout=None) as client:
-            with client.stream("POST", "/v1/models/pull", json={"model": name}) as response:
+            with client.stream(
+                "POST", "/v1/models/pull", json={"model": name}
+            ) as response:
                 response.raise_for_status()
                 for line in response.iter_lines():
                     if not line:
@@ -216,10 +234,14 @@ def models_delete(name: str):
 
 
 @app.command()
-def serve(port: Optional[int] = typer.Option(None, "--port", help="Override default port")):
+def serve(
+    port: Optional[int] = typer.Option(None, "--port", help="Override default port"),
+):
     """Start the Aura Core FastAPI server."""
     port = port or CONFIG.core_port
-    typer.secho(f"Starting Aura Core on 127.0.0.1:{port}...", fg=typer.colors.CYAN, bold=True)
+    typer.secho(
+        f"Starting Aura Core on 127.0.0.1:{port}...", fg=typer.colors.CYAN, bold=True
+    )
     # Mandate check: Bind only to 127.0.0.1
     uvicorn.run("aura.main:app", host="127.0.0.1", port=port, log_level="info")
 

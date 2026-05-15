@@ -8,6 +8,7 @@ import structlog
 
 logger = structlog.get_logger()
 
+
 class AudioStreamer:
     """
     Handles continuous audio capture with a rolling buffer.
@@ -20,25 +21,27 @@ class AudioStreamer:
         self.max_samples = sample_rate * buffer_duration_s
         self.channels = 1
         self.dtype = "int16"
-        
+
         self._buffer: deque[np.ndarray] = deque()
         self._current_sample_count = 0
         self._lock = threading.Lock()
         self._stream: Optional[sd.InputStream] = None
 
-    def _callback(self, indata: np.ndarray, frames: int, time_info: dict, status: sd.CallbackFlags) -> None:
+    def _callback(
+        self, indata: np.ndarray, frames: int, time_info: dict, status: sd.CallbackFlags
+    ) -> None:
         """
         Callback for the sounddevice input stream.
         Runs in a separate high-priority thread.
         """
         if status:
             logger.warning("audio_stream_status_warning", status=str(status))
-        
+
         with self._lock:
             # indata is a numpy array of shape (frames, channels)
             self._buffer.append(indata.copy())
             self._current_sample_count += frames
-            
+
             # Maintain the rolling window (last 10 seconds)
             while self._current_sample_count > self.max_samples and self._buffer:
                 removed = self._buffer.popleft()
@@ -59,13 +62,13 @@ class AudioStreamer:
                 channels=self.channels,
                 dtype=self.dtype,
                 callback=self._callback,
-                blocksize=int(self.sample_rate * 0.1)  # 100ms blocks
+                blocksize=int(self.sample_rate * 0.1),  # 100ms blocks
             )
             self._stream.start()
             logger.info(
-                "audio_stream_started", 
-                sample_rate=self.sample_rate, 
-                buffer_duration_s=self.buffer_duration_s
+                "audio_stream_started",
+                sample_rate=self.sample_rate,
+                buffer_duration_s=self.buffer_duration_s,
             )
             return True
         except sd.PortAudioError as e:
@@ -97,7 +100,7 @@ class AudioStreamer:
         with self._lock:
             if not self._buffer:
                 return np.array([], dtype=self.dtype)
-            
+
             # Concatenate all chunks into a single 1D array
             return np.concatenate(self._buffer, axis=0).flatten()
 

@@ -23,10 +23,10 @@ async def get_health(
     """
     # Aura is online if this code is running
     aura_online = True
-    
+
     # Check Ollama health
     ollama_online = await ollama_client.health()
-    
+
     # Get currently active model from manager
     active_model = None
     if ollama_online:

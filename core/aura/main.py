@@ -51,7 +51,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         structlog.contextvars.bind_contextvars(request_id=request_id)
 
         start_time = time.perf_counter()
-        
+
         try:
             response = await call_next(request)
         except Exception as e:
@@ -64,7 +64,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             raise e
 
         duration_ms = int((time.perf_counter() - start_time) * 1000)
-        
+
         logger.info(
             "request_finished",
             method=request.method,
@@ -72,7 +72,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             status_code=response.status_code,
             duration_ms=duration_ms,
         )
-        
+
         response.headers["X-Request-ID"] = request_id
         return response
 
@@ -84,39 +84,47 @@ async def lifespan(app: FastAPI):
     """
     # 1. Configure Logging
     configure_logging()
-    
+
     # 2. Initialize Singletons in app.state
     # This ensures consistency across requests and makes testing easier
     app.state.event_bus = get_event_bus()
     app.state.tool_registry = get_tool_registry()
     app.state.approval_gate = get_approval_gate()
-    
+
     # 3. Start Event Bus Dispatch Loop
     dispatch_task = asyncio.create_task(app.state.event_bus.dispatch_loop())
-    
+
     # 4. Setup WebSocket Forwarding
     await ws.forward_events_to_ws()
-    
+
     # 5. Verify Ollama Health with Retries
     ollama_client = get_ollama_client()
     ollama_ready = False
     logger.info("waiting_for_ollama")
-    
+
     for i in range(30):
         if await ollama_client.health():
             ollama_ready = True
             logger.info("ollama_connected")
             break
         await asyncio.sleep(1)
-        
+
     if not ollama_ready:
-        logger.warning("ollama_connection_timeout", message="Core starting anyway, but Ollama features may fail.")
+        logger.warning(
+            "ollama_connection_timeout",
+            message="Core starting anyway, but Ollama features may fail.",
+        )
+
+    # 6. Initialize RAG Database
+    from aura.rag.db import init_db
+
+    await init_db()
 
     # Store startup time for health endpoint
     app.state.start_time = time.time()
-    
+
     yield
-    
+
     # Shutdown logic
     dispatch_task.cancel()
     try:
@@ -131,7 +139,7 @@ def create_app() -> FastAPI:
     Factory function to create and configure the FastAPI application.
     """
     config = get_config()
-    
+
     app = FastAPI(
         title="Aura Core",
         description="Privacy-first AI desktop layer",
@@ -142,7 +150,9 @@ def create_app() -> FastAPI:
     # Middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Restricted by localhost binding but allowing for local UI
+        allow_origins=[
+            "*"
+        ],  # Restricted by localhost binding but allowing for local UI
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -162,6 +172,7 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
+
     config = get_config()
     logger.info("starting_aura_core", port=config.core_port)
     uvicorn.run(app, host="127.0.0.1", port=config.core_port, log_level="info")

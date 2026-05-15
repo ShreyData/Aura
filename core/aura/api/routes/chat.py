@@ -1,11 +1,10 @@
-import asyncio
 import json
 import time
 import uuid
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from aura.api.deps import get_ollama_client, get_approval_gate, get_tool_registry
@@ -17,7 +16,6 @@ from aura.api.schemas import (
     ChatCompletionResponse,
     ChatCompletionResponseChoice,
     ChatMessage,
-    PendingToolCall,
 )
 from aura.config import Settings, get_config
 from aura.events import EventBus, get_event_bus
@@ -48,7 +46,7 @@ async def chat_completions(
 
     # Build initial message list including system prompt and context
     raw_messages = [m.model_dump(exclude_none=True) for m in request.messages]
-    
+
     # If tools are not provided in request, use all available tools from registry
     tool_schemas = request.tools
     if not tool_schemas:
@@ -106,70 +104,90 @@ async def chat_completions(
 
                 except ToolCallDetected as e:
                     logger.info("tool_call_detected", tool_name=e.tool_name)
-                    
+
                     tool = tool_registry.get_tool(e.tool_name)
                     if not tool:
                         logger.error("tool_not_found", tool_name=e.tool_name)
-                        messages.append({
-                            "role": "assistant",
-                            "content": e.partial_response
-                        })
-                        messages.append({
-                            "role": "tool",
-                            "name": e.tool_name,
-                            "content": json.dumps({"error": f"Tool {e.tool_name} not found"})
-                        })
+                        messages.append(
+                            {"role": "assistant", "content": e.partial_response}
+                        )
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "name": e.tool_name,
+                                "content": json.dumps(
+                                    {"error": f"Tool {e.tool_name} not found"}
+                                ),
+                            }
+                        )
                         continue
 
                     # 1. Approval Gate
                     approved = True
                     # Check risk level and config
-                    if (tool.risk_level.value == "high" or 
-                        (tool.risk_level.value == "medium" and config.require_approval_medium)):
-                        
+                    if tool.risk_level.value == "high" or (
+                        tool.risk_level.value == "medium"
+                        and config.require_approval_medium
+                    ):
                         approved = await approval_gate.request_approval(
                             tool_name=e.tool_name,
                             description=tool.description,
                             args=e.tool_args,
-                            risk_level=tool.risk_level
+                            risk_level=tool.risk_level,
                         )
 
                     if approved:
                         # 2. Execute Tool
-                        logger.info("executing_tool", tool_name=e.tool_name, args=e.tool_args)
-                        await event_bus.publish("tool_call_start", {"tool_name": e.tool_name, "args": e.tool_args})
-                        
+                        logger.info(
+                            "executing_tool", tool_name=e.tool_name, args=e.tool_args
+                        )
+                        await event_bus.publish(
+                            "tool_call_start",
+                            {"tool_name": e.tool_name, "args": e.tool_args},
+                        )
+
                         result = await tool.execute(**e.tool_args)
-                        
-                        await event_bus.publish("tool_result", {
-                            "tool_name": e.tool_name,
-                            "success": result.success,
-                            "output": result.output,
-                            "error": result.error
-                        })
-                        
+
+                        await event_bus.publish(
+                            "tool_result",
+                            {
+                                "tool_name": e.tool_name,
+                                "success": result.success,
+                                "output": result.output,
+                                "error": result.error,
+                            },
+                        )
+
                         # 3. Inject result and resume
                         tool_call_id = str(uuid.uuid4())
-                        messages.append({
-                            "role": "assistant",
-                            "content": e.partial_response,
-                            "tool_calls": [
-                                {
-                                    "id": tool_call_id,
-                                    "type": "function",
-                                    "function": {
-                                        "name": e.tool_name,
-                                        "arguments": json.dumps(e.tool_args)
+                        messages.append(
+                            {
+                                "role": "assistant",
+                                "content": e.partial_response,
+                                "tool_calls": [
+                                    {
+                                        "id": tool_call_id,
+                                        "type": "function",
+                                        "function": {
+                                            "name": e.tool_name,
+                                            "arguments": json.dumps(e.tool_args),
+                                        },
                                     }
-                                }
-                            ]
-                        })
-                        messages.append({
-                            "role": "tool",
-                            "name": e.tool_name,
-                            "content": json.dumps(result.output if result.success else {"error": result.error})
-                        })
-                        
+                                ],
+                            }
+                        )
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "name": e.tool_name,
+                                "content": json.dumps(
+                                    result.output
+                                    if result.success
+                                    else {"error": result.error}
+                                ),
+                            }
+                        )
+
                         logger.info("resuming_after_tool_call", tool_name=e.tool_name)
                     else:
                         # Tool denied

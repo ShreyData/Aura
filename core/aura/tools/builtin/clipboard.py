@@ -5,6 +5,7 @@ from aura.tools.registry import register_tool
 
 logger = structlog.get_logger()
 
+
 @register_tool
 class ReadClipboardTool(Tool):
     name = "read_clipboard"
@@ -21,6 +22,7 @@ class ReadClipboardTool(Tool):
             logger.error("read_clipboard_failed", error=str(e))
             return ToolResult(success=False, output=None, error=str(e))
 
+
 @register_tool
 class WriteClipboardTool(Tool):
     name = "write_clipboard"
@@ -30,15 +32,20 @@ class WriteClipboardTool(Tool):
     parameters = {
         "type": "object",
         "properties": {
-            "text": {"type": "string", "description": "The text to write to the clipboard"}
+            "text": {
+                "type": "string",
+                "description": "The text to write to the clipboard",
+            }
         },
-        "required": ["text"]
+        "required": ["text"],
     }
 
     async def execute(self, text: str) -> ToolResult:
         try:
             pyperclip.copy(text)
-            return ToolResult(success=True, output="Text copied to clipboard successfully.")
+            return ToolResult(
+                success=True, output="Text copied to clipboard successfully."
+            )
         except Exception as e:
             logger.error("write_clipboard_failed", error=str(e))
             return ToolResult(success=False, output=None, error=str(e))

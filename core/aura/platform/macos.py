@@ -1,4 +1,3 @@
-import os
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
@@ -56,12 +55,12 @@ class MacOSAdapter(PlatformAdapter):
             active_app = workspace.activeApplication()
             if active_app and "NSApplicationName" in active_app:
                 return active_app["NSApplicationName"]
-            
+
             # Fallback to modern frontmostApplication if activeApplication fails
             modern_app = workspace.frontmostApplication()
             if modern_app:
                 return modern_app.localizedName()
-                
+
             return "Unknown"
         except Exception as e:
             logger.error("macos_get_active_window_failed", error=str(e))
@@ -115,24 +114,28 @@ class MacOSAdapter(PlatformAdapter):
             content = UNMutableNotificationContent.alloc().init()
             content.setTitle_(title)
             content.setBody_(body)
-            
+
             # Trigger immediately
-            trigger = UNTimeIntervalNotificationTrigger.triggerWithTimeInterval_repeats_(1, False)
-            
+            trigger = (
+                UNTimeIntervalNotificationTrigger.triggerWithTimeInterval_repeats_(
+                    1, False
+                )
+            )
+
             request = UNNotificationRequest.requestWithIdentifier_content_trigger_(
                 "AuraNotification", content, trigger
             )
-            
+
             center = UNUserNotificationCenter.currentNotificationCenter()
-            
+
             # Request authorization (normally done at startup, but here for completeness)
             def handler(granted, error):
                 if granted:
                     center.addNotificationRequest_withCompletionHandler_(request, None)
-            
+
             center.requestAuthorizationWithOptions_completionHandler_(
-                (1 << 0) | (1 << 1) | (1 << 2), # Alert, Sound, Badge
-                handler
+                (1 << 0) | (1 << 1) | (1 << 2),  # Alert, Sound, Badge
+                handler,
             )
         except Exception as e:
             logger.error("macos_notification_failed", error=str(e))
@@ -149,16 +152,18 @@ class MacOSAdapter(PlatformAdapter):
             screens = NSScreen.screens()
             for screen in screens:
                 frame = screen.frame()
-                displays.append({
-                    "resolution": {
-                        "width": frame.size.width,
-                        "height": frame.size.height
-                    },
-                    "is_primary": screen == NSScreen.mainScreen()
-                })
+                displays.append(
+                    {
+                        "resolution": {
+                            "width": frame.size.width,
+                            "height": frame.size.height,
+                        },
+                        "is_primary": screen == NSScreen.mainScreen(),
+                    }
+                )
         except Exception as e:
             logger.error("macos_get_display_info_failed", error=str(e))
-            
+
         return displays
 
     def lock_screen(self) -> None:
@@ -168,8 +173,11 @@ class MacOSAdapter(PlatformAdapter):
         try:
             # Traditional method via loginwindow
             subprocess.run(
-                ["/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession", "-suspend"],
-                check=False
+                [
+                    "/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession",
+                    "-suspend",
+                ],
+                check=False,
             )
         except Exception as e:
             logger.error("macos_lock_screen_failed", error=str(e))
@@ -192,12 +200,12 @@ class MacOSAdapter(PlatformAdapter):
         """
         if not Quartz:
             return 0.0
-            
+
         try:
             # CGEventSourceSecondsSinceLastEventType(kCGEventSourceStateCombinedSessionState, kCGAnyInputEventType)
             idle_time = Quartz.CGEventSourceSecondsSinceLastEventType(
                 Quartz.kCGEventSourceStateCombinedSessionState,
-                Quartz.kCGAnyInputEventType
+                Quartz.kCGAnyInputEventType,
             )
             return float(idle_time)
         except Exception as e:

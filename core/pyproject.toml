@@ -25,6 +25,8 @@ dependencies = [
     "python-xlib; sys_platform == 'linux'",
     "pyobjc; sys_platform == 'darwin'",
     "pywin32; sys_platform == 'win32'",
+    "aiosqlite>=0.22.1",
+    "sqlite-vec>=0.1.9",
 ]
 
 [project.scripts]

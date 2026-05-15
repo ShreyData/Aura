@@ -19,13 +19,21 @@ def register_tool(cls: Type[Tool]) -> Type[Tool]:
     Must be used on classes that inherit from Tool.
     """
     if not issubclass(cls, Tool):
-        logger.error("tool_registration_failed", class_name=cls.__name__, error="Class must inherit from Tool")
+        logger.error(
+            "tool_registration_failed",
+            class_name=cls.__name__,
+            error="Class must inherit from Tool",
+        )
         return cls
 
     # Ensure the class has a name attribute defined
     name = getattr(cls, "name", None)
     if not name:
-        logger.error("tool_registration_failed", class_name=cls.__name__, error="Tool missing 'name' attribute")
+        logger.error(
+            "tool_registration_failed",
+            class_name=cls.__name__,
+            error="Tool missing 'name' attribute",
+        )
         return cls
 
     _TOOL_CLASSES[name] = cls
@@ -66,7 +74,7 @@ class ToolRegistry:
             # This import will be valid after Step 2.4 is completed
             from aura.platform.factory import get_platform
 
-            # If the factory is available, we could use the instance for more 
+            # If the factory is available, we could use the instance for more
             # granular capability checks in the future.
             platform_adapter = get_platform()
             logger.debug("platform_adapter_detected", platform=current_platform)
@@ -76,7 +84,10 @@ class ToolRegistry:
         # 3. Filter and instantiate tools
         for name, cls in _TOOL_CLASSES.items():
             # Filter by platform: ["all"], ["windows"], ["macos"], or ["linux"]
-            if "all" in cls.enabled_platforms or current_platform in cls.enabled_platforms:
+            if (
+                "all" in cls.enabled_platforms
+                or current_platform in cls.enabled_platforms
+            ):
                 try:
                     instance = cls()
                     if instance.is_available():
@@ -87,7 +98,11 @@ class ToolRegistry:
                 except Exception as e:
                     logger.error("tool_initialization_failed", name=name, error=str(e))
             else:
-                logger.debug("tool_platform_mismatch_skipped", name=name, platform=current_platform)
+                logger.debug(
+                    "tool_platform_mismatch_skipped",
+                    name=name,
+                    platform=current_platform,
+                )
 
         logger.info("tool_registry_ready", total_tools=len(self.tools))
 
@@ -98,7 +113,9 @@ class ToolRegistry:
         """
         try:
             package = importlib.import_module(package_name)
-            for _, module_name, is_pkg in pkgutil.walk_packages(package.__path__, package.__name__ + "."):
+            for _, module_name, is_pkg in pkgutil.walk_packages(
+                package.__path__, package.__name__ + "."
+            ):
                 importlib.import_module(module_name)
         except Exception as e:
             logger.warning("package_scan_error", package=package_name, error=str(e))
