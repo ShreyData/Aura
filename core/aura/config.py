@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     auto_unload_minutes: int = 5
     rag_db_path: Path = Path.home() / ".aura" / "knowledge.db"
+    history_db_path: Path = Path.home() / ".aura" / "history.db"
 
     model_config = SettingsConfigDict(
         env_prefix="AURA_",

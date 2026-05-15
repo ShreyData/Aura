@@ -120,6 +120,11 @@ async def lifespan(app: FastAPI):
 
     await init_db()
 
+    # 7. Initialize History Database
+    from aura.memory.history import init_history_db
+
+    await init_history_db()
+
     # Store startup time for health endpoint
     app.state.start_time = time.time()
 
