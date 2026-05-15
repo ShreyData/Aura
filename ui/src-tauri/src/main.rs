@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod process;
+mod ipc;
 
 use tauri::Manager;
 
@@ -12,6 +13,18 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .invoke_handler(tauri::generate_handler![
+            ipc::health,
+            ipc::recommend_model,
+            ipc::approve_tool,
+            ipc::get_pending_tools,
+            ipc::ingest_file,
+            ipc::list_models,
+            ipc::pull_model,
+            ipc::delete_model,
+            ipc::get_config,
+            ipc::update_config,
+        ])
         .setup(|app| {
             let handle = app.handle().clone();
             
