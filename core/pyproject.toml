@@ -23,7 +23,6 @@ dependencies = [
     "silero-vad",
     "onnxruntime",
     "python-xlib; sys_platform == 'linux'",
-    "dbus-python; sys_platform == 'linux'",
     "pyobjc; sys_platform == 'darwin'",
     "pywin32; sys_platform == 'win32'",
 ]
@@ -31,8 +30,8 @@ dependencies = [
 [project.scripts]
 aura = "cli:app"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest",
     "pytest-asyncio",
     "respx",

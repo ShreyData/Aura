@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     Loads values from environment variables (AURA_*) and ~/.aura/config.toml.
     """
 
-    core_port: int = 11430
-    ollama_port: int = 11434
+    core_port: int = 11434
+    ollama_port: int = 11435
     ollama_models_dir: str = str(Path.home() / ".aura" / "models")
     default_model: str = "gemma:2b"
     embed_model: str = "nomic-embed-text"
