@@ -31,3 +31,10 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+
+# UI and Tauri
+ui/node_modules/
+ui/dist/
+ui/src-tauri/target/
+ui/src-tauri/binaries/ollama-*
+ui/src-tauri/binaries/aura-core-*

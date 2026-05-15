@@ -1,0 +1,33 @@
+[package]
+name = "aura"
+version = "0.1.0"
+description = "Privacy-first, ambient AI desktop layer powered by Gemma 4"
+authors = ["Team 369"]
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = "2.0.0"
+
+[dependencies]
+tauri = { version = "2.0.0", features = ["image-ico", "image-png", "protocol-asset"] }
+tauri-plugin-shell = "2.0.0"
+tauri-plugin-process = "2.0.0"
+tauri-plugin-dialog = "2.0.0"
+tauri-plugin-global-shortcut = "2.0.0"
+tauri-plugin-window-state = "2.0.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.12", features = ["json"] }
+tokio = { version = "1.37", features = ["full"] }
+anyhow = "1.0"
+dirs = "5.0"
+nix = { version = "0.28", features = ["signal"], optional = false }
+structlog = { version = "0.1", optional = true } # Placeholder if needed, but we'll use println for now or a rust logger
+log = "0.4"
+env_logger = "0.11"
+
+[features]
+# this feature is used for production builds or when `devPath` points to the filesystem
+# DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]
