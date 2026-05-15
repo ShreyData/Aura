@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from aura.api.deps import get_ollama_client
-from aura.api.routes import chat, health, models, tools, ws
+from aura.api.routes import chat, health, models, rag, tools, ws
 from aura.config import get_config
 from aura.events import get_event_bus
 from aura.tools.registry import get_tool_registry
@@ -138,8 +138,6 @@ def create_app() -> FastAPI:
     """
     Factory function to create and configure the FastAPI application.
     """
-    config = get_config()
-
     app = FastAPI(
         title="Aura Core",
         description="Privacy-first AI desktop layer",
@@ -164,6 +162,7 @@ def create_app() -> FastAPI:
     app.include_router(ws.router)
     app.include_router(models.router)
     app.include_router(tools.router)
+    app.include_router(rag.router)
 
     return app
 

@@ -136,3 +136,46 @@ class ToolApprovalRequest(BaseModel):
 
     request_id: str
     approved: bool
+
+
+# --- RAG Specific Models ---
+
+
+class RAGIngestRequest(BaseModel):
+    """
+    Request body for ingesting a file into the RAG system.
+    """
+
+    path: str
+
+
+class RAGDocument(BaseModel):
+    """
+    Metadata for a document in the RAG system.
+    """
+
+    id: int
+    path: str
+    hash: str
+    created_at: str
+
+
+class RAGQueryRequest(BaseModel):
+    """
+    Request body for querying the RAG system.
+    """
+
+    query: str
+    top_k: int = 5
+
+
+class RAGSearchResult(BaseModel):
+    """
+    A single search result from the RAG system.
+    """
+
+    id: int
+    content: str
+    path: str
+    score: float
+    type: str

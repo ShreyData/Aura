@@ -21,6 +21,7 @@ from aura.config import Settings, get_config
 from aura.events import EventBus, get_event_bus
 from aura.io.prompt_composer import build_messages
 from aura.ollama.client import OllamaClient, ToolCallDetected
+from aura.rag.retriever import hybrid_search
 from aura.tools.approval import ApprovalGate
 from aura.tools.registry import ToolRegistry
 
@@ -52,9 +53,19 @@ async def chat_completions(
     if not tool_schemas:
         tool_schemas = tool_registry.generate_tool_schemas()
 
+    # RAG: Search for relevant context based on the last user message
+    rag_context = []
+    if raw_messages and raw_messages[-1]["role"] == "user":
+        try:
+            results = await hybrid_search(raw_messages[-1]["content"], top_k=5)
+            rag_context = [res["content"] for res in results]
+        except Exception as e:
+            logger.error("rag_retrieval_failed", error=str(e))
+
     messages = build_messages(
         messages=raw_messages,
         tool_schemas=tool_schemas,
+        rag_context=rag_context,
     )
 
     async def stream_generator():
