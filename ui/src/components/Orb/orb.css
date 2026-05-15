@@ -1,0 +1,121 @@
+.orb-container {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-app-region: drag; /* Allows dragging the whole window */
+  overflow: hidden;
+}
+
+.orb {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+  position: relative;
+}
+
+/* --- States --- */
+
+/* IDLE: White, slow pulse, 48px */
+.orb-idle {
+  background-color: #ffffff;
+  animation: pulse 4s infinite ease-in-out;
+}
+
+/* LISTENING: Blue #3B82F6, scale 1.15 */
+.orb-listening {
+  background-color: #3b82f6;
+  transform: scale(1.15);
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.6);
+  animation: breathe 1s infinite alternate ease-in-out;
+}
+
+/* THINKING: Amber #F59E0B, rotating gradient */
+.orb-thinking {
+  background: conic-gradient(from 0deg, #f59e0b, #fbbf24, #f59e0b);
+  animation: rotate 1.5s infinite linear;
+  box-shadow: 0 0 25px rgba(245, 158, 11, 0.5);
+}
+
+/* SPEAKING: Same as blue but with dynamic pulse */
+.orb-speaking {
+  background-color: #3b82f6;
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.8);
+  animation: talk 0.3s infinite alternate ease-in-out;
+}
+
+/* ACTING: Green #10B981 */
+.orb-acting {
+  background-color: #10b981;
+  box-shadow: 0 0 30px rgba(16, 185, 129, 0.6);
+  animation: glow 2s infinite alternate ease-in-out;
+}
+
+/* ERROR: Red #EF4444 */
+.orb-error {
+  background-color: #ef4444;
+  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.7);
+}
+
+/* --- Animations --- */
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(0.95);
+    opacity: 1;
+  }
+}
+
+@keyframes breathe {
+  from {
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+  }
+  to {
+    transform: scale(1.2);
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.8);
+  }
+}
+
+@keyframes talk {
+  from {
+    transform: scale(1.1);
+  }
+  to {
+    transform: scale(1.3);
+  }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+  }
+  to {
+    box-shadow: 0 0 45px rgba(16, 185, 129, 0.9);
+  }
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
