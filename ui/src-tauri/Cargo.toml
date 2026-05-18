@@ -7,25 +7,26 @@ edition = "2021"
 rust-version = "1.77"
 
 [build-dependencies]
-tauri-build = "2.0.0"
+tauri-build = { version = "2.0.0", features = [] }
 
 [dependencies]
-tauri = { version = "2.0.0", features = ["image-ico", "image-png", "protocol-asset", "tray-icon", "menu"] }
-tauri-plugin-shell = "2.0.0"
-tauri-plugin-process = "2.0.0"
-tauri-plugin-dialog = "2.0.0"
-tauri-plugin-global-shortcut = "2.0.0"
-tauri-plugin-window-state = "2.0.0"
+tauri = { version = "2.11.2", features = ["image-ico", "image-png", "tray-icon"] }
+tauri-plugin-shell = "2.3.5"
+tauri-plugin-process = "2.3.1"
+tauri-plugin-dialog = "2.7.1"
+tauri-plugin-global-shortcut = "2.3.1"
+tauri-plugin-window-state = "2.4.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 reqwest = { version = "0.12", features = ["json"] }
 tokio = { version = "1.37", features = ["full"] }
 anyhow = "1.0"
 dirs = "5.0"
-nix = { version = "0.28", features = ["signal"], optional = false }
-structlog = { version = "0.1", optional = true } # Placeholder if needed, but we'll use println for now or a rust logger
 log = "0.4"
 env_logger = "0.11"
+
+[target.'cfg(not(windows))'.dependencies]
+nix = { version = "0.28", features = ["signal"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

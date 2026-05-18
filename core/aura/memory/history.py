@@ -1,11 +1,11 @@
 import base64
 import os
-from typing import Any, Dict, List, Optional
-
 import aiosqlite
 import keyring
 import structlog
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from typing import AsyncGenerator, List, Dict, Any, Optional
+from contextlib import asynccontextmanager
 
 from aura.config import get_config
 
@@ -73,21 +73,25 @@ def get_encryptor() -> Encryptor:
     return _encryptor
 
 
-async def get_db():
+@asynccontextmanager
+async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
+    """
+    Async context manager that provides a connection to the history database.
+    """
     config = get_config()
     db_path = config.history_db_path
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    db = await aiosqlite.connect(str(db_path))
-    db.row_factory = aiosqlite.Row
-    return db
+    async with aiosqlite.connect(str(db_path)) as db:
+        db.row_factory = aiosqlite.Row
+        yield db
 
 
 async def init_history_db():
     """
     Initializes the history database schema.
     """
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
@@ -119,7 +123,7 @@ async def save_message(
     encryptor = get_encryptor()
     encrypted_content = encryptor.encrypt(content)
 
-    async with await get_db() as db:
+    async with get_db() as db:
         # Ensure session exists
         cursor = await db.execute("SELECT id FROM sessions WHERE id = ?", (session_id,))
         if not await cursor.fetchone():
@@ -147,7 +151,7 @@ async def get_session(session_id: str) -> List[Dict[str, Any]]:
     encryptor = get_encryptor()
     messages = []
 
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute(
             "SELECT role, content, created_at FROM messages WHERE session_id = ? ORDER BY created_at ASC",
             (session_id,),
@@ -174,7 +178,7 @@ async def list_sessions() -> List[Dict[str, Any]]:
     """
     Lists all chat sessions.
     """
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute(
             "SELECT id, title, created_at, updated_at FROM sessions ORDER BY updated_at DESC"
         ) as cursor:
@@ -186,7 +190,7 @@ async def delete_session(session_id: str):
     """
     Deletes a session and all its messages.
     """
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
         await db.commit()
     logger.info("session_deleted", session_id=session_id)

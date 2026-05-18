@@ -1,7 +1,7 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    AppHandle, Manager, Runtime,
+    AppHandle, Emitter, Manager, Runtime,
 };
 
 pub fn setup<R: Runtime>(app: &AppHandle<R>) -> anyhow::Result<()> {
@@ -32,11 +32,6 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> anyhow::Result<()> {
                     }
                 }
                 "settings" => {
-                    // Settings is usually a view in Hub or a separate window.
-                    // The prompt doesn't specify a settings window label, 
-                    // but docs/UI_Architecture.md says "settings" lives in Hub.
-                    // Wait, UI_Architecture.md table shows: orb, hub, permission, onboarding.
-                    // So "Settings" probably opens Hub at the settings view.
                     if let Some(window) = app.get_webview_window("hub") {
                         let _ = window.show();
                         let _ = window.set_focus();

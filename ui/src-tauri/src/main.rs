@@ -60,12 +60,6 @@ fn main() {
 
             Ok(())
         })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                // If it's the main window closing, we might want to kill all
-                // but Tauri app lifecycle handles this better.
-            }
-        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 

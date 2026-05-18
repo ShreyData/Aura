@@ -7,11 +7,11 @@
   ],
   "permissions": [
     "core:default",
+    "core:window:default",
     "shell:default",
-    "shell:allow-execute",
     "dialog:default",
     "global-shortcut:default",
     "process:default",
-    "window:default"
+    "window-state:default"
   ]
 }
